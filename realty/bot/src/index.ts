@@ -29,8 +29,41 @@ function fmtDate(d: Date): string {
   });
 }
 
+/**
+ * If the Telegram user is in REALTOR_TG_IDS, make sure they have a row in the `agents` table
+ * (and remove any stale `clients` row). This is the source of truth read by the API server,
+ * so the role works even if the API container's env didn't reload.
+ */
+async function ensureAgentRecord(tgId: number, firstName?: string, lastName?: string, username?: string) {
+  if (!isRealtor(tgId)) return;
+  const tg = String(tgId);
+  const existing = await pool.query<{ id: number }>(
+    'SELECT id FROM agents WHERE tg_id = $1', [tg]
+  );
+  if (existing.rowCount === 0) {
+    const name = [firstName, lastName].filter(Boolean).join(' ') || 'Ріелтор';
+    await pool.query(
+      `INSERT INTO agents (tg_id, name, tg_username) VALUES ($1, $2, $3)`,
+      [tg, name, username ?? null]
+    );
+    // Migrate: if same tg_id was previously stored as a client, remove that row so the user
+    // is unambiguously a realtor.
+    await pool.query(`DELETE FROM clients WHERE tg_id = $1`, [tg]);
+  } else {
+    await pool.query(
+      `UPDATE agents SET tg_username = COALESCE($2, tg_username), updated_at = now() WHERE id = $1`,
+      [existing.rows[0].id, username ?? null]
+    );
+  }
+}
+
 // ─── Commands ───
 bot.command('start', async (ctx) => {
+  // Make sure realtor accounts are bootstrapped in the database.
+  await ensureAgentRecord(ctx.from!.id, ctx.from!.first_name, ctx.from!.last_name, ctx.from!.username).catch((e) => {
+    console.error('[bot] ensureAgentRecord failed', e);
+  });
+
   // Support deep-link to a specific property: /start property_42
   const payload = ctx.match;
   if (payload && payload.startsWith('property_') && APP_URL) {

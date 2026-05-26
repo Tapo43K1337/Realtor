@@ -50,17 +50,28 @@ export type SessionUser = {
   username?: string;
 };
 
-/** Upsert the current user (agent or client) and return session payload. */
+/** Upsert the current user (agent or client) and return session payload.
+ *
+ * Source of truth for role is the `agents` table — if a row exists for this tg_id, the user
+ * is a realtor. The env-var REALTOR_TG_IDS only controls _initial bootstrap_ (creating that row
+ * when the user opens the Mini App for the first time). This keeps the role correct even if
+ * REALTOR_TG_IDS was edited after the container started.
+ */
 export async function ensureUser(tg: TgUser): Promise<SessionUser> {
   const tgId = BigInt(tg.id);
 
-  if (isRealtor(tgId)) {
-    const existing = await query<{ id: number; name: string }>(
-      'SELECT id, name FROM agents WHERE tg_id = $1',
-      [tgId.toString()]
-    );
+  // 1) DB-first check: is this user already a realtor?
+  const existingAgent = await query<{ id: number; name: string }>(
+    'SELECT id, name FROM agents WHERE tg_id = $1',
+    [tgId.toString()]
+  );
+
+  const dbSaysRealtor = existingAgent.rowCount! > 0;
+  const envSaysRealtor = isRealtor(tgId);
+
+  if (dbSaysRealtor || envSaysRealtor) {
     let agentId: number;
-    if (existing.rowCount === 0) {
+    if (existingAgent.rowCount === 0) {
       const insert = await query<{ id: number }>(
         `INSERT INTO agents (tg_id, name, tg_username)
          VALUES ($1, $2, $3) RETURNING id`,
@@ -71,8 +82,11 @@ export async function ensureUser(tg: TgUser): Promise<SessionUser> {
         ]
       );
       agentId = insert.rows[0].id;
+      // If the user previously logged in as a client (before realtor status was set up),
+      // clean up the stale client row so they're unambiguously a realtor going forward.
+      await query('DELETE FROM clients WHERE tg_id = $1', [tgId.toString()]);
     } else {
-      agentId = existing.rows[0].id;
+      agentId = existingAgent.rows[0].id;
       await query(
         `UPDATE agents SET tg_username = COALESCE($2, tg_username), updated_at = now()
          WHERE id = $1`,

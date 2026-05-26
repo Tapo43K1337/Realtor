@@ -1,19 +1,15 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '../components';
+import { TgHeader } from '../components';
+import { I } from '../icons';
+import { UA } from '../data/ua';
 import type { Currency, DealType, PropertyType } from '../types';
-
-const DISTRICTS = [
-  'Соборний', 'Шевченківський', 'Центральний',
-  'Чечелівський', 'Новокодацький', 'Самарський',
-  'Амур-Нижньодніпровський', 'Індустріальний',
-];
 
 export function FiltersScreen() {
   const navigate = useNavigate();
   const [type, setType] = useState<PropertyType | ''>('');
   const [deal, setDeal] = useState<DealType | ''>('');
-  const [district, setDistrict] = useState('');
+  const [districts, setDistricts] = useState<Set<string>>(new Set());
   const [roomsMin, setRoomsMin] = useState('');
   const [roomsMax, setRoomsMax] = useState('');
   const [priceMin, setPriceMin] = useState('');
@@ -26,7 +22,7 @@ export function FiltersScreen() {
     const params = new URLSearchParams();
     if (type) params.set('type', type);
     if (deal) params.set('deal', deal);
-    if (district) params.set('district', district);
+    if (districts.size === 1) params.set('district', [...districts][0]);
     if (roomsMin) params.set('rooms_min', roomsMin);
     if (roomsMax) params.set('rooms_max', roomsMax);
     if (priceMin) params.set('price_min', priceMin);
@@ -38,81 +34,134 @@ export function FiltersScreen() {
   };
 
   const reset = () => {
-    setType(''); setDeal(''); setDistrict('');
+    setType(''); setDeal(''); setDistricts(new Set());
     setRoomsMin(''); setRoomsMax(''); setPriceMin(''); setPriceMax('');
     setAreaMin(''); setAreaMax('');
   };
 
-  return (
-    <div className="tg">
-      <Header title="Фільтри" right={<button className="tg-action" onClick={reset}>Скинути</button>}/>
-      <div className="tg-body" style={{ padding: '4px 16px 20px' }}>
+  const toggleDistrict = (d: string) => {
+    setDistricts((s) => {
+      const n = new Set(s);
+      if (n.has(d)) n.delete(d); else n.add(d);
+      return n;
+    });
+  };
 
-        <div className="filter-block">
-          <div className="title">Тип угоди</div>
-          <div className="segment">
+  const Section = ({ title, count, children }: { title: string; count?: string; children: ReactNode }) => (
+    <div style={{ padding: '20px 20px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</div>
+        {count !== undefined && <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{count}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="tg" style={{ position: 'relative' }}>
+      <TgHeader
+        title="Фільтри"
+        right={<button className="tg-action" onClick={reset} style={{ fontSize: 14, color: 'var(--muted)' }}>Скинути</button>}
+      />
+
+      {/* Scrollable content area; sticky apply bar at bottom */}
+      <div className="tg-body" style={{ overflowY: 'auto', paddingBottom: 110 }}>
+
+        {/* Deal type segmented */}
+        <div style={{ padding: '4px 20px 0' }}>
+          <div className="segment" style={{ height: 38 }}>
+            <button className={deal === 'sale' ? 'on' : ''} onClick={() => setDeal(deal === 'sale' ? '' : 'sale')}>Купити</button>
+            <button className={deal === 'rent' ? 'on' : ''} onClick={() => setDeal(deal === 'rent' ? '' : 'rent')}>Орендувати</button>
             <button className={deal === '' ? 'on' : ''} onClick={() => setDeal('')}>Усі</button>
-            <button className={deal === 'sale' ? 'on' : ''} onClick={() => setDeal('sale')}>Купити</button>
-            <button className={deal === 'rent' ? 'on' : ''} onClick={() => setDeal('rent')}>Оренда</button>
           </div>
         </div>
 
-        <div className="filter-block">
-          <div className="title">Тип нерухомості</div>
+        {/* Property type */}
+        <Section title="Тип нерухомості">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {([
-              ['', 'Усі'],
               ['apartment', 'Квартира'],
               ['house', 'Будинок'],
               ['commercial', 'Комерція'],
-              ['land', 'Земля'],
+              ['land', 'Ділянка'],
             ] as const).map(([v, l]) => (
-              <button key={l} className={`chip ${type === v ? 'solid' : ''}`} onClick={() => setType(v as any)}>{l}</button>
+              <button key={v} className={'chip lg ' + (type === v ? 'solid' : '')} onClick={() => setType(type === v ? '' : v as PropertyType)}>{l}</button>
             ))}
           </div>
-        </div>
+        </Section>
 
-        <div className="filter-block">
-          <div className="title">Район</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <button className={`chip ${district === '' ? 'solid' : ''}`} onClick={() => setDistrict('')}>Усі</button>
-            {DISTRICTS.map((d) => (
-              <button key={d} className={`chip ${district === d ? 'solid' : ''}`} onClick={() => setDistrict(d)}>{d}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="filter-block">
-          <div className="title">Кількість кімнат</div>
-          <div className="row-2">
-            <input className="input" placeholder="Від" inputMode="numeric" value={roomsMin} onChange={(e) => setRoomsMin(e.target.value)}/>
-            <input className="input" placeholder="До" inputMode="numeric" value={roomsMax} onChange={(e) => setRoomsMax(e.target.value)}/>
-          </div>
-        </div>
-
-        <div className="filter-block">
-          <div className="title">Ціна</div>
-          <div className="segment" style={{ marginBottom: 8, maxWidth: 140 }}>
+        {/* Price */}
+        <Section title="Ціна" count={currency}>
+          <div className="segment" style={{ marginBottom: 10, maxWidth: 140 }}>
             <button className={currency === 'USD' ? 'on' : ''} onClick={() => setCurrency('USD')}>USD</button>
             <button className={currency === 'UAH' ? 'on' : ''} onClick={() => setCurrency('UAH')}>UAH</button>
           </div>
           <div className="row-2">
-            <input className="input" placeholder="Від" inputMode="numeric" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}/>
-            <input className="input" placeholder="До" inputMode="numeric" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}/>
+            <div className="input" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, padding: '0 14px', height: 48 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Від</span>
+              <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} inputMode="numeric"
+                placeholder="0"
+                style={{ border: 0, background: 'transparent', fontSize: 15, width: '100%', padding: 0 }}/>
+            </div>
+            <div className="input" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, padding: '0 14px', height: 48 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>До</span>
+              <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} inputMode="numeric"
+                placeholder="—"
+                style={{ border: 0, background: 'transparent', fontSize: 15, width: '100%', padding: 0 }}/>
+            </div>
           </div>
-        </div>
+        </Section>
 
-        <div className="filter-block">
-          <div className="title">Площа, м²</div>
+        {/* Rooms */}
+        <Section title="Кількість кімнат">
+          <div className="row-2">
+            <input className="input" placeholder="Від" inputMode="numeric" value={roomsMin} onChange={(e) => setRoomsMin(e.target.value)}/>
+            <input className="input" placeholder="До" inputMode="numeric" value={roomsMax} onChange={(e) => setRoomsMax(e.target.value)}/>
+          </div>
+        </Section>
+
+        {/* Area */}
+        <Section title="Площа" count="м²">
           <div className="row-2">
             <input className="input" placeholder="Від" inputMode="numeric" value={areaMin} onChange={(e) => setAreaMin(e.target.value)}/>
             <input className="input" placeholder="До" inputMode="numeric" value={areaMax} onChange={(e) => setAreaMax(e.target.value)}/>
           </div>
-        </div>
+        </Section>
 
-        <div style={{ padding: '16px' }}>
-          <button className="btn btn-primary" onClick={apply}>Застосувати</button>
+        {/* Districts */}
+        <Section title="Райони Дніпра" count={districts.size > 0 ? `${districts.size} обрано` : ''}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {UA.districts.map((d) => {
+              const on = districts.has(d);
+              return (
+                <button key={d} className={'chip ' + (on ? 'solid' : '')} onClick={() => toggleDistrict(d)}>
+                  {on && I.check({ s: 12, c: '#fff' })} {d}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+        <div style={{ height: 120 }}/>
+      </div>
+
+      {/* Sticky bottom apply bar */}
+      <div style={{
+        position: 'fixed', left: 0, right: 0,
+        bottom: 0,
+        padding: '12px 16px calc(env(safe-area-inset-bottom) + 14px)',
+        borderTop: '0.5px solid var(--hair)',
+        background: 'var(--bg)',
+        display: 'flex', alignItems: 'center', gap: 12,
+        zIndex: 50,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Знайдено</div>
+          <div className="num-display" style={{ fontSize: 22, whiteSpace: 'nowrap' }}>— об'єктів</div>
         </div>
+        <button className="btn btn-primary" style={{ flex: '1.4 1 0', minWidth: 0 }} onClick={apply}>
+          Показати {I.chev({ s: 14, c: '#fff' })}
+        </button>
       </div>
     </div>
   );

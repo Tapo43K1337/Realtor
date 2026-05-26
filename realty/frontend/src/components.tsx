@@ -4,6 +4,7 @@ import { I } from './icons';
 import { useSession } from './session';
 import { fmt, priceInUsd, priceInUah } from './utils/format';
 import { UA, coverVariant, deriveTitle, type CoverVariant } from './data/ua';
+import { tg } from './tg';
 import type { Property, Photo } from './types';
 
 // ─────────── Telegram-style header ───────────
@@ -21,7 +22,9 @@ export function TgHeader({
 }) {
   const navigate = useNavigate();
   const cls = ['tg-head', blur && 'blur', dark && 'dark', over && 'over'].filter(Boolean).join(' ');
-  const showBack = onBack !== false;
+  // Inside Telegram, the native BackButton replaces our in-app one to avoid duplicates.
+  const useTelegramBack = !!tg;
+  const showBack = onBack !== false && !useTelegramBack;
   const handleBack = typeof onBack === 'function' ? onBack : () => navigate(-1);
   return (
     <div className={cls}>
@@ -36,6 +39,8 @@ export function TgHeader({
       </div>
       {right ? right : action ? (
         <button className="tg-action">{action}</button>
+      ) : useTelegramBack ? (
+        <div style={{ width: 34 }}/>
       ) : (
         <button className="tg-back" aria-label="menu">{I.dots({ s: 16 })}</button>
       )}

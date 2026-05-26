@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
+/* Fonts are loaded non-blocking via <link> in index.html for faster startup */
 
 :root{
   --bg:        #F6F4EF;
@@ -50,7 +50,10 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .tg-head{
   position: sticky; top: 0;
   padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
-  display:flex; align-items:center; gap:10px;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 10px;
   z-index: 5;
   background: var(--bg);
 }
@@ -97,7 +100,7 @@ input:focus, textarea:focus, select:focus { outline: none; }
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-top: 0.5px solid var(--hair-2);
   display:flex; justify-content: space-around;
-  z-index: 100;
+  z-index: 1000;
 }
 .tg-tab{
   display:flex; flex-direction:column; align-items:center; gap:3px;
