@@ -211,7 +211,8 @@ export function AgentProfileScreen() {
 
       {/* Sticky save bar */}
       <div style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0,
+        position: 'fixed', left: 0, right: 0,
+        bottom: 'var(--tg-content-bottom)',
         padding: '12px 16px calc(env(safe-area-inset-bottom) + 14px)',
         borderTop: '0.5px solid var(--hair)',
         background: 'var(--bg)',

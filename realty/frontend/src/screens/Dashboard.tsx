@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmtPrice } from '../api';
-import { Header } from '../components';
 import { IconPlus } from '../icons';
 
 export function DashboardScreen() {
@@ -23,9 +22,6 @@ export function DashboardScreen() {
           <div className="eyebrow">Кабінет</div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22 }}>Ріелтор</div>
         </div>
-        <button className="tg-back" onClick={() => navigate('/edit/new')}>
-          <IconPlus/>
-        </button>
       </header>
 
       <div className="tg-body" style={{ padding: '8px 16px' }}>
@@ -115,6 +111,8 @@ export function DashboardScreen() {
             </div>
           ))}
         </div>
+        {/* Bottom spacer — clears tab bar + Telegram bottom chrome */}
+        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 120px)' }}/>
       </div>
     </div>
   );

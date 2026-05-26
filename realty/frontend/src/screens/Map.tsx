@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../api';
@@ -12,11 +12,16 @@ import { UA } from '../data/ua';
 const DNIPRO: [number, number] = [48.4647, 35.0462];
 
 function makeMarker(label: string, active = false) {
+  // Estimate width from label length so the pill fits the text without clipping.
+  // Leaflet positions the icon based on iconSize/iconAnchor — using realistic
+  // values keeps the pill centered over the actual lat/lng.
+  const approxW = Math.max(56, label.length * 8 + 22);
+  const approxH = 30;
   return L.divIcon({
     className: 'leaflet-pin-wrap',
     html: `<div class="leaflet-pin-marker${active ? ' active' : ''}">${label}</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
+    iconSize: [approxW, approxH],
+    iconAnchor: [approxW / 2, approxH / 2],
   });
 }
 
@@ -34,17 +39,25 @@ function FitToBounds({ items }: { items: Property[] }) {
 
 export function MapScreen() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Property[] | null>(null);
   const currency: Currency = 'USD';
 
   useEffect(() => {
-    api.listProperties({ limit: 50, status: 'active' })
+    const f: any = { limit: 100, status: 'active' };
+    for (const k of ['type', 'deal', 'district', 'building_type', 'condition',
+                     'rooms_min', 'rooms_max', 'price_min', 'price_max',
+                     'area_min', 'area_max', 'currency']) {
+      const v = searchParams.get(k);
+      if (v) f[k] = v;
+    }
+    api.listProperties(f)
       .then((r) => {
         setItems(r.items);
         if (r.rate) setUsdUahRate(r.rate);
       })
       .catch(() => setItems([]));
-  }, []);
+  }, [searchParams]);
 
   const withCoords = (items ?? []).filter((p) => p.lat != null && p.lng != null);
 
@@ -76,7 +89,7 @@ export function MapScreen() {
         <button
           className="glass tg-back"
           style={{ width: 44, height: 44, flexShrink: 0 }}
-          onClick={() => navigate('/filters')}
+          onClick={() => navigate('/filters', { state: { from: '/map' } })}
           aria-label="filters"
         >
           {I.slider({ s: 16 })}
@@ -88,7 +101,7 @@ export function MapScreen() {
         onClick={() => navigate('/')}
         style={{
           position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-          bottom: 'calc(env(safe-area-inset-bottom) + 90px)',
+          bottom: 'calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 90px)',
           zIndex: 500, height: 40, padding: '0 18px', borderRadius: 100,
           background: 'var(--ink)', color: '#fff', fontSize: 13, fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: 8,
@@ -101,7 +114,7 @@ export function MapScreen() {
       {/* Map itself — leaves space at bottom for the tab bar */}
       <div className="map-wrap" style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        bottom: 'calc(env(safe-area-inset-bottom) + 72px)', zIndex: 1,
+        bottom: 'calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 72px)', zIndex: 1,
       }}>
         <MapContainer
           center={DNIPRO}

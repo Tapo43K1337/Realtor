@@ -18,6 +18,13 @@
   --font-ui: 'Manrope', -apple-system, system-ui, sans-serif;
   --font-display: 'Instrument Serif', 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Telegram chrome insets — populated at runtime by tgReady().
+     contentSafeAreaInset.bottom > 0 when the Mini App is launched via "Open"
+     and Telegram's bottom panel is visible. */
+  --tg-safe-top: 0px;
+  --tg-safe-bottom: 0px;
+  --tg-content-top: 0px;
+  --tg-content-bottom: 0px;
 }
 *{ box-sizing: border-box; }
 html { color-scheme: light; }
@@ -87,13 +94,14 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .tg-body{
   flex:1;
   overflow-x: hidden;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 80px);
 }
 .tg-body::-webkit-scrollbar{ display:none; }
 
-/* tab bar */
+/* tab bar — sits above Telegram bottom chrome via --tg-content-bottom */
 .tg-tabs{
-  position: fixed; bottom: 0; left:0; right:0;
+  position: fixed; left:0; right:0;
+  bottom: var(--tg-content-bottom);
   padding: 9px 0 calc(env(safe-area-inset-bottom) + 14px);
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(24px) saturate(180%);
@@ -464,7 +472,7 @@ input:focus, textarea:focus, select:focus { outline: none; }
 
 /* Toast */
 .toast{
-  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 90px); left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 90px); left: 50%; transform: translateX(-50%);
   background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 100px;
   font-size: 13.5px; z-index: 300;
   box-shadow: 0 12px 30px rgba(20,19,15,0.25);
@@ -482,6 +490,19 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .prop-card .cover img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 .prop-card .cover .badges{ position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
 .prop-card .cover .fav{ position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+
+/* Floating action button used over hero photos (detail screen, etc.) */
+.fav{
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.92);
+  color: var(--ink);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 0.5px solid rgba(255,255,255,0.6);
+  box-shadow: 0 2px 8px rgba(20,19,15,0.18);
+}
+.fav:active{ transform: scale(0.95); }
 .prop-card .body{ padding: 14px 16px 16px; }
 .prop-card .price{ font-family: var(--font-display); font-size: 28px; line-height: 1; }
 .prop-card .price-sec{ color: var(--muted); font-size: 12.5px; margin-top: 4px; }
@@ -491,8 +512,36 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .filter-block{ padding: 14px 16px; }
 .filter-block .title{ font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 
-.gallery-overlay{ position: fixed; inset: 0; background: #000; z-index: 500; display: flex; flex-direction: column; }
-.gallery-overlay .image-area{ flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.gallery-overlay{ position: fixed; inset: 0; background: #000; z-index: 1500; display: flex; flex-direction: column; }
+.gallery-overlay .image-area{ flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
 .gallery-overlay img{ max-width: 100%; max-height: 100%; object-fit: contain; }
-.gallery-overlay .top{ position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; color: #fff; display: flex; align-items: center; justify-content: space-between; z-index: 2; }
-.gallery-overlay .top .close{ width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; }
+/* Position the close button below Telegram's own back button (which sits at the
+   very top of the chrome) so the two don't overlap. */
+.gallery-overlay .top{
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: calc(env(safe-area-inset-top) + var(--tg-safe-top) + var(--tg-content-top) + 56px) 16px 12px;
+  color: #fff; display: flex; align-items: center; justify-content: space-between; z-index: 2;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+  pointer-events: none;
+}
+.gallery-overlay .top > *{ pointer-events: auto; }
+.gallery-overlay .top .close{
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+}
+.gallery-overlay .thumbs{
+  display: flex; gap: 6px; padding: 8px 12px calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 8px);
+  overflow-x: auto;
+}
+.gallery-overlay .tap-zone{
+  position: absolute; top: 0; bottom: 0; width: 40%;
+  z-index: 1; background: transparent;
+}
+.gallery-overlay .tap-zone.left{ left: 0; }
+.gallery-overlay .tap-zone.right{ right: 0; }
+
+/* Hide the bottom tab bar while the gallery overlay is open — gives photos
+   the full screen and prevents the nav from showing through above the photo. */
+body.gallery-open .tg-tabs{ display: none; }

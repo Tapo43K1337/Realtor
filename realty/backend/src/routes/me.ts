@@ -12,7 +12,9 @@ export async function meRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: requireAuth }, async (req) => {
     if (req.user.role === 'realtor') {
       const r = await query(
-        'SELECT id, name, position, tg_username, phone, photo FROM agents WHERE id = $1',
+        `SELECT id, name, position, tg_username, phone, photo,
+                experience_years, deals_count, bio, languages
+         FROM agents WHERE id = $1`,
         [req.user.agentId]
       );
       return { role: 'realtor', profile: r.rows[0] };

@@ -5,7 +5,7 @@ import type { Property } from '../types';
 import { Header, Loading, showToast } from '../components';
 import { IconHeart, IconHeartFilled, IconShare, IconPhone, IconTelegram, IconCalendar, IconPin, IconBed, IconArea, IconFloor } from '../icons';
 import { useSession } from '../session';
-import { openTelegramChat, shareViaTelegram, tgConfirm } from '../tg';
+import { openTelegramChat, shareViaTelegram, tgPopup } from '../tg';
 
 export function DetailScreen() {
   const { id } = useParams();
@@ -29,9 +29,16 @@ export function DetailScreen() {
   const cover = p.photos.find((ph) => ph.is_cover) ?? p.photos[0];
 
   const toggleFav = async () => {
-    if (session?.user.role !== 'client') return;
-    if (fav) { await api.removeFavorite(p.id); setFav(false); }
-    else { await api.addFavorite(p.id); setFav(true); showToast("Додано в обране"); }
+    if (session?.user.role !== 'client') {
+      showToast('Обране доступне лише клієнтам');
+      return;
+    }
+    try {
+      if (fav) { await api.removeFavorite(p.id); setFav(false); }
+      else { await api.addFavorite(p.id); setFav(true); showToast("Додано в обране"); }
+    } catch {
+      showToast('Не вдалося оновити обране');
+    }
   };
 
   const shareIt = async () => {
@@ -51,10 +58,23 @@ export function DetailScreen() {
   };
 
   const closeProperty = async () => {
-    const sold = await tgConfirm("Помітити як продано/здано? (інакше — знято з продажу)");
-    await api.closeProperty(p.id, sold ? 'sold_rented' : 'withdrawn');
-    showToast("Статус оновлено");
-    navigate('/dashboard');
+    const choice = await tgPopup({
+      title: "Закрити об'єкт",
+      message: "Оберіть статус закриття",
+      buttons: [
+        { id: 'sold', type: 'default', text: p.deal === 'rent' ? 'Успішно здано' : 'Успішно продано' },
+        { id: 'withdrawn', type: 'destructive', text: 'Відмова / зняти з продажу' },
+        { id: 'cancel', type: 'cancel' },
+      ],
+    });
+    if (!choice || choice === 'cancel') return; // user cancelled — do nothing
+    try {
+      await api.closeProperty(p.id, choice === 'sold' ? 'sold_rented' : 'withdrawn');
+      showToast("Статус оновлено");
+      navigate('/dashboard');
+    } catch {
+      showToast('Помилка оновлення статусу');
+    }
   };
 
   const isOwner = session?.user.role === 'realtor';
@@ -69,14 +89,14 @@ export function DetailScreen() {
              onClick={() => navigate(`/property/${p.id}/gallery`)}>
           {cover ? <img src={cover.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> :
                    <div className="ph" style={{ width: '100%', height: '100%' }}/>}
-          <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', gap: 8 }}>
+          <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', gap: 10 }}>
             {session?.user.role === 'client' && (
-              <button className="fav" onClick={(e) => { e.stopPropagation(); toggleFav(); }}>
-                {fav ? <IconHeartFilled width={18} height={18}/> : <IconHeart width={18} height={18}/>}
+              <button className="fav" aria-label="favorite" onClick={(e) => { e.stopPropagation(); toggleFav(); }}>
+                {fav ? <IconHeartFilled width={22} height={22}/> : <IconHeart width={22} height={22}/>}
               </button>
             )}
-            <button className="fav" onClick={(e) => { e.stopPropagation(); shareIt(); }}>
-              <IconShare width={18} height={18}/>
+            <button className="fav" aria-label="share" onClick={(e) => { e.stopPropagation(); shareIt(); }}>
+              <IconShare width={22} height={22}/>
             </button>
           </div>
           {p.photos.length > 1 && (

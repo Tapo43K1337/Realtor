@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { TgHeader } from '../components';
 import { I } from '../icons';
 import { UA } from '../data/ua';
@@ -8,20 +8,44 @@ import type { Currency, DealType, PropertyType } from '../types';
 const BUILDING_TYPES = ['новобудова', 'сталінка', 'хрущовка', 'чешка', 'вторинка', 'інше'] as const;
 const CONDITIONS = ['дизайн-ремонт', 'євроремонт', 'житловий стан', 'під ремонт', 'без ремонту'] as const;
 
+// Defined OUTSIDE the component so it's not re-created on every render.
+// (Previously inline, which caused inputs to lose focus / keyboard to close
+//  after each keystroke because React saw a "new" component on each render.)
+function Section({ title, count, children }: { title: string; count?: string; children: ReactNode }) {
+  return (
+    <div style={{ padding: '20px 20px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</div>
+        {count !== undefined && <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{count}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function FiltersScreen() {
   const navigate = useNavigate();
-  const [type, setType] = useState<PropertyType | ''>('');
-  const [deal, setDeal] = useState<DealType | ''>('');
-  const [districts, setDistricts] = useState<Set<string>>(new Set());
-  const [buildingType, setBuildingType] = useState('');
-  const [condition, setCondition] = useState('');
-  const [roomsMin, setRoomsMin] = useState('');
-  const [roomsMax, setRoomsMax] = useState('');
-  const [priceMin, setPriceMin] = useState('');
-  const [priceMax, setPriceMax] = useState('');
-  const [areaMin, setAreaMin] = useState('');
-  const [areaMax, setAreaMax] = useState('');
-  const [currency, setCurrency] = useState<Currency>('USD');
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  // Remember where the user came from so "Показати" returns there with applied filters.
+  // Defaults to Feed.
+  const returnTo: '/' | '/map' = (location.state as any)?.from === '/map' ? '/map' : '/';
+  // Pre-fill from existing URL params so the screen reflects current Feed state.
+  const [type, setType] = useState<PropertyType | ''>(() => (searchParams.get('type') as PropertyType) || '');
+  const [deal, setDeal] = useState<DealType | ''>(() => (searchParams.get('deal') as DealType) || '');
+  const [districts, setDistricts] = useState<Set<string>>(() => {
+    const d = searchParams.get('district');
+    return d ? new Set([d]) : new Set();
+  });
+  const [buildingType, setBuildingType] = useState(() => searchParams.get('building_type') || '');
+  const [condition, setCondition] = useState(() => searchParams.get('condition') || '');
+  const [roomsMin, setRoomsMin] = useState(() => searchParams.get('rooms_min') || '');
+  const [roomsMax, setRoomsMax] = useState(() => searchParams.get('rooms_max') || '');
+  const [priceMin, setPriceMin] = useState(() => searchParams.get('price_min') || '');
+  const [priceMax, setPriceMax] = useState(() => searchParams.get('price_max') || '');
+  const [areaMin, setAreaMin] = useState(() => searchParams.get('area_min') || '');
+  const [areaMax, setAreaMax] = useState(() => searchParams.get('area_max') || '');
+  const [currency, setCurrency] = useState<Currency>(() => (searchParams.get('currency') as Currency) || 'USD');
 
   const apply = () => {
     const params = new URLSearchParams();
@@ -37,7 +61,7 @@ export function FiltersScreen() {
     if (areaMin) params.set('area_min', areaMin);
     if (areaMax) params.set('area_max', areaMax);
     params.set('currency', currency);
-    navigate(`/?${params.toString()}`);
+    navigate(`${returnTo}?${params.toString()}`);
   };
 
   const reset = () => {
@@ -55,22 +79,9 @@ export function FiltersScreen() {
     });
   };
 
-  const Section = ({ title, count, children }: { title: string; count?: string; children: ReactNode }) => (
-    <div style={{ padding: '20px 20px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</div>
-        {count !== undefined && <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{count}</div>}
-      </div>
-      {children}
-    </div>
-  );
-
   return (
     <div className="tg" style={{ position: 'relative' }}>
-      <TgHeader
-        title="Фільтри"
-        right={<button className="tg-action" onClick={reset} style={{ fontSize: 14, color: 'var(--muted)' }}>Скинути</button>}
-      />
+      <TgHeader title="Фільтри"/>
 
       {/* Scrollable content area; sticky apply bar at bottom */}
       <div className="tg-body" style={{ overflowY: 'auto', paddingBottom: 110 }}>
@@ -78,9 +89,9 @@ export function FiltersScreen() {
         {/* Deal type segmented */}
         <div style={{ padding: '4px 20px 0' }}>
           <div className="segment" style={{ height: 38 }}>
-            <button className={deal === 'sale' ? 'on' : ''} onClick={() => setDeal(deal === 'sale' ? '' : 'sale')}>Купити</button>
-            <button className={deal === 'rent' ? 'on' : ''} onClick={() => setDeal(deal === 'rent' ? '' : 'rent')}>Орендувати</button>
             <button className={deal === '' ? 'on' : ''} onClick={() => setDeal('')}>Усі</button>
+            <button className={deal === 'sale' ? 'on' : ''} onClick={() => setDeal('sale')}>Купити</button>
+            <button className={deal === 'rent' ? 'on' : ''} onClick={() => setDeal('rent')}>Орендувати</button>
           </div>
         </div>
 
@@ -182,7 +193,7 @@ export function FiltersScreen() {
       {/* Sticky bottom apply bar — z-index above TabBar (1000) and Telegram chrome */}
       <div style={{
         position: 'fixed', left: 0, right: 0,
-        bottom: 0,
+        bottom: 'var(--tg-content-bottom)',
         padding: '12px 16px calc(env(safe-area-inset-bottom) + 14px)',
         borderTop: '0.5px solid var(--hair)',
         background: 'var(--bg)',
@@ -190,7 +201,7 @@ export function FiltersScreen() {
         zIndex: 2000,
         boxShadow: '0 -8px 24px rgba(20,19,15,0.08)',
       }}>
-        <button className="btn btn-secondary" style={{ flex: '0 0 auto', padding: '0 18px' }} onClick={reset}>
+        <button className="btn btn-secondary" style={{ flex: 1, minWidth: 0 }} onClick={reset}>
           Скинути
         </button>
         <button className="btn btn-primary" style={{ flex: 1, minWidth: 0 }} onClick={apply}>
