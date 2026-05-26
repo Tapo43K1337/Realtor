@@ -45,3 +45,21 @@ export async function deletePhotoFiles(propertyId: number, filename: string, thu
 export function photoUrl(propertyId: number, filename: string): string {
   return `/uploads/properties/${propertyId}/${filename}`;
 }
+
+/** Store an agent avatar — square 512px, JPEG. Returns a public URL path. */
+export async function processAndStoreAgentPhoto(agentId: number, buffer: Buffer): Promise<string> {
+  const dir = join(config.uploadsDir, 'agents', String(agentId));
+  await mkdir(dir, { recursive: true });
+
+  const stamp = Date.now();
+  const rnd = randomBytes(4).toString('hex');
+  const filename = `${stamp}_${rnd}.jpg`;
+
+  await sharp(buffer)
+    .rotate()
+    .resize({ width: 512, height: 512, fit: 'cover' })
+    .jpeg({ quality: 85, mozjpeg: true })
+    .toFile(join(dir, filename));
+
+  return `/uploads/agents/${agentId}/${filename}`;
+}

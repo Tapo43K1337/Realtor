@@ -59,6 +59,8 @@ const listQuery = z.object({
   type: Type.optional(),
   deal: Deal.optional(),
   district: z.string().optional(),
+  building_type: z.string().optional(),
+  condition: z.string().optional(),
   rooms_min: z.coerce.number().optional(),
   rooms_max: z.coerce.number().optional(),
   price_min: z.coerce.number().optional(),
@@ -163,6 +165,8 @@ export async function propertyRoutes(app: FastifyInstance) {
     if (q.type) add('p.type = ?', q.type);
     if (q.deal) add('p.deal = ?', q.deal);
     if (q.district) add('p.district = ?', q.district);
+    if (q.building_type) add('p.building_type = ?', q.building_type);
+    if (q.condition) add('p.condition = ?', q.condition);
     if (q.rooms_min != null) add('p.rooms >= ?', q.rooms_min);
     if (q.rooms_max != null) add('p.rooms <= ?', q.rooms_max);
     if (q.area_min != null) add('p.area_total >= ?', q.area_min);

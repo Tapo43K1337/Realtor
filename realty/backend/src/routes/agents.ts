@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { query } from '../db.js';
 import { requireRealtor } from '../auth.js';
+import { processAndStoreAgentPhoto } from '../services/photos.js';
 
 const updateBody = z.object({
   name: z.string().min(1).max(120).optional(),
@@ -54,5 +55,22 @@ export async function agentRoutes(app: FastifyInstance) {
     args.push(req.user.agentId);
     await query(`UPDATE agents SET ${sets.join(', ')} WHERE id = $${args.length}`, args);
     return { ok: true };
+  });
+
+  // Realtor: upload own avatar
+  app.post('/me/photo', { preHandler: requireRealtor }, async (req: any, reply) => {
+    const agentId = req.user.agentId;
+    if (!agentId) return reply.code(400).send({ error: 'no_agent' });
+    const parts = req.parts();
+    let url: string | null = null;
+    for await (const part of parts) {
+      if (part.type !== 'file') continue;
+      const buf = await part.toBuffer();
+      url = await processAndStoreAgentPhoto(agentId, buf);
+      break; // single photo only
+    }
+    if (!url) return reply.code(400).send({ error: 'no_file' });
+    await query(`UPDATE agents SET photo = $1, updated_at = now() WHERE id = $2`, [url, agentId]);
+    return { photo: url };
   });
 }

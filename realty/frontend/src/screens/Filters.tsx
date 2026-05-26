@@ -5,11 +5,16 @@ import { I } from '../icons';
 import { UA } from '../data/ua';
 import type { Currency, DealType, PropertyType } from '../types';
 
+const BUILDING_TYPES = ['новобудова', 'сталінка', 'хрущовка', 'чешка', 'вторинка', 'інше'] as const;
+const CONDITIONS = ['дизайн-ремонт', 'євроремонт', 'житловий стан', 'під ремонт', 'без ремонту'] as const;
+
 export function FiltersScreen() {
   const navigate = useNavigate();
   const [type, setType] = useState<PropertyType | ''>('');
   const [deal, setDeal] = useState<DealType | ''>('');
   const [districts, setDistricts] = useState<Set<string>>(new Set());
+  const [buildingType, setBuildingType] = useState('');
+  const [condition, setCondition] = useState('');
   const [roomsMin, setRoomsMin] = useState('');
   const [roomsMax, setRoomsMax] = useState('');
   const [priceMin, setPriceMin] = useState('');
@@ -23,6 +28,8 @@ export function FiltersScreen() {
     if (type) params.set('type', type);
     if (deal) params.set('deal', deal);
     if (districts.size === 1) params.set('district', [...districts][0]);
+    if (buildingType) params.set('building_type', buildingType);
+    if (condition) params.set('condition', condition);
     if (roomsMin) params.set('rooms_min', roomsMin);
     if (roomsMax) params.set('rooms_max', roomsMax);
     if (priceMin) params.set('price_min', priceMin);
@@ -35,6 +42,7 @@ export function FiltersScreen() {
 
   const reset = () => {
     setType(''); setDeal(''); setDistricts(new Set());
+    setBuildingType(''); setCondition('');
     setRoomsMin(''); setRoomsMax(''); setPriceMin(''); setPriceMax('');
     setAreaMin(''); setAreaMax('');
   };
@@ -128,6 +136,32 @@ export function FiltersScreen() {
           </div>
         </Section>
 
+        {/* Building type */}
+        <Section title="Тип будинку">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {BUILDING_TYPES.map((b) => (
+              <button
+                key={b}
+                className={'chip ' + (buildingType === b ? 'solid' : '')}
+                onClick={() => setBuildingType(buildingType === b ? '' : b)}
+              >{b}</button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Condition */}
+        <Section title="Стан">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {CONDITIONS.map((c) => (
+              <button
+                key={c}
+                className={'chip ' + (condition === c ? 'solid' : '')}
+                onClick={() => setCondition(condition === c ? '' : c)}
+              >{c}</button>
+            ))}
+          </div>
+        </Section>
+
         {/* Districts */}
         <Section title="Райони Дніпра" count={districts.size > 0 ? `${districts.size} обрано` : ''}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -142,10 +176,10 @@ export function FiltersScreen() {
           </div>
         </Section>
 
-        <div style={{ height: 120 }}/>
+        <div style={{ height: 140 }}/>
       </div>
 
-      {/* Sticky bottom apply bar */}
+      {/* Sticky bottom apply bar — z-index above TabBar (1000) and Telegram chrome */}
       <div style={{
         position: 'fixed', left: 0, right: 0,
         bottom: 0,
@@ -153,13 +187,13 @@ export function FiltersScreen() {
         borderTop: '0.5px solid var(--hair)',
         background: 'var(--bg)',
         display: 'flex', alignItems: 'center', gap: 12,
-        zIndex: 50,
+        zIndex: 2000,
+        boxShadow: '0 -8px 24px rgba(20,19,15,0.08)',
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Знайдено</div>
-          <div className="num-display" style={{ fontSize: 22, whiteSpace: 'nowrap' }}>— об'єктів</div>
-        </div>
-        <button className="btn btn-primary" style={{ flex: '1.4 1 0', minWidth: 0 }} onClick={apply}>
+        <button className="btn btn-secondary" style={{ flex: '0 0 auto', padding: '0 18px' }} onClick={reset}>
+          Скинути
+        </button>
+        <button className="btn btn-primary" style={{ flex: 1, minWidth: 0 }} onClick={apply}>
           Показати {I.chev({ s: 14, c: '#fff' })}
         </button>
       </div>

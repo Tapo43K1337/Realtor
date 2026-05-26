@@ -95,6 +95,11 @@ export const api = {
   listAgents: () => req<{ items: Agent[] }>('/agents'),
   updateAgentMe: (body: Partial<Agent>) =>
     req<{ ok: true }>('/agents/me', { method: 'PUT', body: JSON.stringify(body) }),
+  uploadAgentPhoto: (file: File) => {
+    const fd = new FormData();
+    fd.append('photo', file, file.name);
+    return reqForm<{ photo: string }>('/agents/me/photo', fd);
+  },
 
   // Viewings
   createViewing: (body: {

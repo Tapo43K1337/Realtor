@@ -77,10 +77,13 @@ export function DashboardScreen() {
           </>
         )}
 
-        <button className="btn btn-secondary" onClick={() => navigate('/leads')} style={{ marginBottom: 14 }}>
+        <button className="btn btn-secondary" onClick={() => navigate('/agent-profile')} style={{ marginBottom: 10, width: '100%' }}>
+          Редагувати свій профіль
+        </button>
+        <button className="btn btn-secondary" onClick={() => navigate('/leads')} style={{ marginBottom: 10, width: '100%' }}>
           Усі заявки на перегляд
         </button>
-        <button className="btn btn-primary" onClick={() => navigate('/edit/new')} style={{ marginBottom: 20 }}>
+        <button className="btn btn-primary" onClick={() => navigate('/edit/new')} style={{ marginBottom: 20, width: '100%' }}>
           <IconPlus width={18} height={18}/> Додати об'єкт
         </button>
 

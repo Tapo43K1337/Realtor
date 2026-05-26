@@ -4,11 +4,10 @@ import { api } from '../api';
 import type { Property, Currency, DealType } from '../types';
 import { useSession } from '../session';
 import {
-  TgHeader, TabBar, BldgImage, ListingCardLg, ListingCard, ListingRow, SectionHeader,
-  showToast,
+  TgHeader, ListingCardLg, ListingRow, SectionHeader, showToast,
 } from '../components';
 import { I } from '../icons';
-import { UA, coverVariant } from '../data/ua';
+import { UA } from '../data/ua';
 import { setUsdUahRate } from '../utils/format';
 
 type Op = 'buy' | 'rent' | 'daily';
@@ -59,8 +58,7 @@ export function FeedScreen() {
 
   const total = items?.length ?? 0;
   const featured = items?.[0];
-  const newOnes = useMemo(() => items?.slice(1, 5) ?? [], [items]);
-  const more = useMemo(() => items?.slice(5, 11) ?? [], [items]);
+  const rest = useMemo(() => items?.slice(1) ?? [], [items]);
 
   const open = (id: number) => navigate(`/property/${id}`);
 
@@ -137,59 +135,12 @@ export function FeedScreen() {
           </>
         )}
 
-        {/* New offers */}
-        {newOnes.length > 0 && (
+        {/* All listings (after featured) */}
+        {rest.length > 0 && (
           <>
-            <SectionHeader title="Нові пропозиції" action={`Усі ${total}`} onAction={() => navigate('/filters')}/>
-            <div className="hscroll">
-              {newOnes.map((it) => (
-                <ListingCard
-                  key={it.id}
-                  property={it}
-                  mainCurrency={mainCurrency}
-                  w={230}
-                  onClick={() => open(it.id)}
-                  isFav={favIds.has(it.id)}
-                  onFav={() => toggleFav(it.id)}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Category tiles */}
-        <SectionHeader title="За форматом"/>
-        <div style={{ padding: '0 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {([
-            { label: 'Новобудови', count: countBy(items, 'building_type', 'новобудова'), bg: 'cool' },
-            { label: 'Сталінки',  count: countBy(items, 'building_type', 'сталінка'),  bg: 'warm' },
-            { label: 'Будинки',   count: countBy(items, 'type', 'house'),              bg: 'clay' },
-            { label: 'Оренда',    count: countBy(items, 'deal', 'rent'),               bg: 'sand' },
-          ] as const).map((c) => (
-            <button
-              key={c.label}
-              style={{ position: 'relative', height: 110, borderRadius: 14, overflow: 'hidden', textAlign: 'left' }}
-              onClick={() => navigate('/filters')}
-            >
-              <BldgImage variant={c.bg as any} height={110} rounded={14}/>
-              <div style={{
-                position: 'absolute', inset: 0, padding: 12, display: 'flex', flexDirection: 'column',
-                justifyContent: 'flex-end', color: '#fff',
-                background: 'linear-gradient(180deg, rgba(20,19,15,0) 30%, rgba(20,19,15,0.55) 100%)',
-              }}>
-                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>{c.label}</div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>{c.count} об'єктів</div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Recent list */}
-        {more.length > 0 && (
-          <>
-            <SectionHeader title="Свіжі оголошення" action="Сортувати"/>
-            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {more.map((it) => (
+            <SectionHeader title={op === 'rent' ? 'Усі об\'єкти в оренду' : op === 'buy' ? 'Усі об\'єкти на продаж' : 'Усі об\'єкти'} action={`${total} шт.`}/>
+            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {rest.map((it) => (
                 <ListingRow
                   key={it.id}
                   property={it}
@@ -203,22 +154,6 @@ export function FeedScreen() {
           </>
         )}
 
-        {/* Market pulse */}
-        <div style={{ padding: '24px 16px 0' }}>
-          <div className="card-flat" style={{ padding: 18 }}>
-            <div className="eyebrow">Ринок · {monthYear()}</div>
-            <div className="h-display" style={{ fontSize: 24, marginTop: 6 }}>
-              {UA.city} · {total} активних об'єктів
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
-              Преміум, вторинний ринок та новобудови. Перегляди організуються через застосунок.
-            </div>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: 14 }} onClick={() => navigate('/map')}>
-              Дивитися на карті {I.chev({ s: 12 })}
-            </button>
-          </div>
-        </div>
-
         {items === null && (
           <div className="center-state"><div className="t">Завантаження…</div></div>
         )}
@@ -229,19 +164,6 @@ export function FeedScreen() {
           </div>
         )}
       </div>
-
-      <TabBar active="home"/>
     </div>
   );
-}
-
-function countBy<T>(arr: T[] | null, key: keyof T, value: any): number {
-  if (!arr) return 0;
-  return arr.filter((x) => x[key] === value).length;
-}
-function monthYear(): string {
-  const d = new Date();
-  const months = ['січень', 'лютий', 'березень', 'квітень', 'травень', 'червень',
-                  'липень', 'серпень', 'вересень', 'жовтень', 'листопад', 'грудень'];
-  return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }

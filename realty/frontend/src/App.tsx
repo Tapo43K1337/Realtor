@@ -13,6 +13,7 @@ import { DashboardScreen } from './screens/Dashboard';
 import { PropertyEditScreen } from './screens/PropertyEdit';
 import { LeadsScreen } from './screens/Leads';
 import { BookViewingScreen } from './screens/BookViewing';
+import { AgentProfileScreen } from './screens/AgentProfile';
 import { tg } from './tg';
 
 function Shell() {
@@ -51,7 +52,7 @@ function Shell() {
   if (loading) return <Loading/>;
   const role = session?.user.role;
 
-  const showTabs = !['/gallery', '/book', '/edit', '/filters'].some((p) => loc.pathname.startsWith(p));
+  const showTabs = !['/gallery', '/book', '/edit', '/filters', '/agent-profile'].some((p) => loc.pathname.startsWith(p));
 
   return (
     <div className="app">
@@ -69,6 +70,7 @@ function Shell() {
           <Route path="/edit/new" element={<PropertyEditScreen/>}/>
           <Route path="/edit/:id" element={<PropertyEditScreen/>}/>
           <Route path="/leads" element={<LeadsScreen/>}/>
+          <Route path="/agent-profile" element={<AgentProfileScreen/>}/>
         </>}
       </Routes>
       {showTabs && <BottomTabs/>}
