@@ -50,12 +50,12 @@ export function AgentProfileScreen() {
     try {
       await api.updateAgentMe({
         name: a.name,
-        position: a.position || null,
+        position: a.position || undefined,
         experience_years: Number(a.experience_years) || 0,
         deals_count: Number(a.deals_count) || 0,
-        bio: a.bio || null,
-        phone: a.phone || null,
-        tg_username: a.tg_username || null,
+        bio: a.bio || undefined,
+        phone: a.phone || undefined,
+        tg_username: a.tg_username || undefined,
         languages: a.languages ?? [],
       });
       showToast('Збережено');
