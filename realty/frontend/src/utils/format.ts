@@ -28,3 +28,12 @@ export function priceInUsd(value: number, currency: 'USD' | 'UAH') {
 export function priceInUah(value: number, currency: 'USD' | 'UAH') {
   return currency === 'UAH' ? value : value * currentRate;
 }
+
+/** Capitalize the first letter of a label for display only.
+ *  Values stored in the DB (e.g. building_type='новобудова') stay lowercase —
+ *  this is purely a UI presentation helper, mirroring how Ukrainian renders
+ *  category labels with an initial capital. */
+export function cap<T extends string | null | undefined>(s: T): T {
+  if (!s) return s;
+  return (s.charAt(0).toLocaleUpperCase('uk-UA') + s.slice(1)) as T;
+}

@@ -73,8 +73,11 @@ export function FeedScreen() {
         setFavIds((s) => new Set(s).add(id));
         showToast('Додано в обране');
       }
-    } catch {
-      showToast('Не вдалося оновити обране');
+    } catch (err: any) {
+      const status = err?.status;
+      if (status === 401) showToast('Сесія застаріла, перезайдіть');
+      else if (status === 403) showToast('Лише клієнти можуть зберігати об\'єкти');
+      else showToast(`Не вдалося оновити обране${status ? ` (${status})` : ''}`);
     }
   };
 

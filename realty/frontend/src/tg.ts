@@ -26,6 +26,7 @@ type Tg = {
   openTelegramLink(url: string): void;
   openLink(url: string): void;
   shareToStory?: (mediaUrl: string, opts?: any) => void;
+  shareMessage?: (msgId: string, cb?: (sent: boolean) => void) => void;
   showAlert(text: string, cb?: () => void): void;
   showConfirm(text: string, cb: (ok: boolean) => void): void;
   showPopup(opts: any, cb?: (id: string) => void): void;
@@ -44,9 +45,16 @@ export function tgReady() {
   tg.ready();
   tg.expand();
 
-  // Mirror Telegram's safe-area / content-safe-area insets into CSS variables so
-  // fixed UI (tab bar, sticky CTAs, gallery close button) doesn't end up under
-  // Telegram's bottom chrome when the Mini App is launched via the "Open" button.
+  // Mark that we're running inside Telegram so CSS can add breathing room above
+  // and below Telegram's chrome (back/close pill, ⌄ + ⋯ menu, bottom panel).
+  document.body.classList.add('in-telegram');
+
+  // Mirror Telegram's safe-area / content-safe-area insets into CSS variables.
+  // On older Telegram clients (<8.0) these properties are undefined; we fall
+  // back to a sensible default so the WebApp header isn't crammed up against
+  // the Telegram chrome.
+  const FALLBACK_TOP = 44;   // approx. height of Telegram's top floating pill
+  const FALLBACK_BOTTOM = 0; // bottom chrome is only present in some modes
   const applyInsets = () => {
     const root = document.documentElement;
     const sa = tg.safeAreaInset;
@@ -58,12 +66,17 @@ export function tgReady() {
     if (csa) {
       root.style.setProperty('--tg-content-top', `${csa.top}px`);
       root.style.setProperty('--tg-content-bottom', `${csa.bottom}px`);
+    } else {
+      // No content-safe-area API available — assume the floating chrome is there
+      root.style.setProperty('--tg-content-top', `${FALLBACK_TOP}px`);
+      root.style.setProperty('--tg-content-bottom', `${FALLBACK_BOTTOM}px`);
     }
   };
   applyInsets();
   tg.onEvent?.('safeAreaChanged', applyInsets);
   tg.onEvent?.('contentSafeAreaChanged', applyInsets);
   tg.onEvent?.('viewportChanged', applyInsets);
+  tg.onEvent?.('fullscreenChanged', applyInsets);
 }
 
 export function tgConfirm(text: string): Promise<boolean> {
@@ -137,6 +150,23 @@ export function shareViaTelegram(url: string, text: string) {
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
   if (tg) tg.openTelegramLink(shareUrl);
   else window.open(shareUrl, '_blank');
+}
+
+/** Share a pre-prepared inline message via Telegram's native picker. Returns true
+ *  if shareMessage is supported and was invoked; false if not available (caller
+ *  should fall back to shareViaTelegram with a plain link). */
+export function shareMessage(preparedId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!tg?.shareMessage) {
+      resolve(false);
+      return;
+    }
+    try {
+      tg.shareMessage(preparedId, (sent) => resolve(sent !== false));
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 export function getInitData(): string {

@@ -5,22 +5,12 @@ import { Header, showToast } from '../components';
 import { useSession } from '../session';
 import { tgHaptic } from '../tg';
 
-const MIN_HOURS = 2;
-
-function minDateTimeLocal(): string {
-  const now = new Date(Date.now() + MIN_HOURS * 3600 * 1000);
-  now.setSeconds(0, 0);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
 export function BookViewingScreen() {
   const { propertyId } = useParams();
   const navigate = useNavigate();
   const { session } = useSession();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [when, setWhen] = useState(minDateTimeLocal());
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,13 +25,6 @@ export function BookViewingScreen() {
 
   const submit = async () => {
     setError(null);
-    const at = new Date(when);
-    const hours = (at.getTime() - Date.now()) / 36e5;
-    if (hours < MIN_HOURS) {
-      setError(`Оберіть час щонайменше за ${MIN_HOURS} години від зараз`);
-      tgHaptic('error');
-      return;
-    }
     if (!name.trim() || !phone.trim()) {
       setError('Заповніть імʼя та телефон');
       return;
@@ -50,7 +33,8 @@ export function BookViewingScreen() {
     try {
       await api.createViewing({
         property_id: Number(propertyId),
-        scheduled_at: at.toISOString(),
+        // No preferred time — the realtor will call to arrange it.
+        scheduled_at: null,
         name: name.trim(),
         phone: phone.trim(),
         note: note.trim() || undefined,
@@ -83,14 +67,6 @@ export function BookViewingScreen() {
       <Header title="Запис на перегляд"/>
       <div className="tg-body" style={{ padding: '16px' }}>
         <div className="field">
-          <label className="label">Бажаний час</label>
-          <input className="input" type="datetime-local" value={when} min={minDateTimeLocal()}
-                 onChange={(e) => setWhen(e.target.value)}/>
-          <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-            Мінімум за {MIN_HOURS} години від поточного моменту
-          </div>
-        </div>
-        <div className="field">
           <label className="label">Ваше ім'я</label>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ім'я"/>
         </div>
@@ -100,7 +76,7 @@ export function BookViewingScreen() {
         </div>
         <div className="field">
           <label className="label">Коментар (необов'язково)</label>
-          <textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Додаткові побажання"/>
+          <textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Бажаний час, побажання…"/>
         </div>
 
         {error && <div className="error-text" style={{ marginBottom: 10 }}>{error}</div>}
@@ -109,7 +85,7 @@ export function BookViewingScreen() {
           {submitting ? 'Надсилаю…' : 'Записатися'}
         </button>
         <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 14 }}>
-          Рієлтор зв'яжеться найближчим часом для підтвердження.
+          Ріелтор зв'яжеться найближчим часом, щоб узгодити зручний час перегляду.
         </div>
       </div>
     </div>

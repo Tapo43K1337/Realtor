@@ -6,6 +6,7 @@ import { api } from '../api';
 import { Header, showToast } from '../components';
 import { tgConfirm, tgHaptic } from '../tg';
 import { IconPlus, IconTrash, IconPin } from '../icons';
+import { cap } from '../utils/format';
 import type { Currency, PropertyType, DealType, Photo } from '../types';
 
 const DNIPRO: [number, number] = [48.4647, 35.0462];
@@ -89,7 +90,13 @@ const empty: Form = {
 export function PropertyEditScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const editing = id && id !== 'new';
+  const initialEditing = !!(id && id !== 'new');
+  // When the user is on /edit/new and uploads a photo before saving, we auto-
+  // create a draft and remember the id locally so subsequent photo ops & the
+  // final save target the same row (no navigation needed).
+  const [createdId, setCreatedId] = useState<number | null>(null);
+  const propId: number | null = initialEditing ? Number(id) : createdId;
+  const isEditing = propId != null;
   const [form, setForm] = useState<Form>(empty);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -97,10 +104,21 @@ export function PropertyEditScreen() {
   const [rate, setRate] = useState<number | null>(null);
   const [featureInput, setFeatureInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  // After ensureDraft → navigate(replace), we don't want the useEffect to refetch
+  // the property and clobber form state the user may have kept typing into.
+  const justCreated = useRef(false);
 
   useEffect(() => {
     api.usdRate().then((r) => setRate(r.usd_uah)).catch(() => {});
-    if (editing) {
+  }, []);
+
+  useEffect(() => {
+    if (justCreated.current) {
+      // Fresh draft just created in-place — keep current form/photo state.
+      justCreated.current = false;
+      return;
+    }
+    if (initialEditing) {
       api.getProperty(Number(id)).then(({ property: p }) => {
         setForm({
           type: p.type, deal: p.deal, status: p.status === 'draft' ? 'draft' : 'active',
@@ -155,6 +173,71 @@ export function PropertyEditScreen() {
 
   const upd = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  const buildBody = (publish: boolean) => {
+    const num = (s: string) => s ? Number(s) : null;
+    return {
+      type: form.type,
+      deal: form.deal,
+      status: publish ? 'active' : form.status,
+      price_value: Number(form.price_value),
+      price_currency: form.price_currency,
+      price_value_secondary: form.price_value_secondary ? Number(form.price_value_secondary) : null,
+      price_currency_secondary: form.price_currency === 'USD' ? 'UAH' : 'USD',
+      address: form.address.trim(),
+      district: form.district || null,
+      complex_name: form.complex_name || null,
+      lat: form.lat, lng: form.lng,
+      area_total: num(form.area_total),
+      area_living: num(form.area_living),
+      area_kitchen: num(form.area_kitchen),
+      rooms: num(form.rooms),
+      floor: num(form.floor),
+      floors_total: num(form.floors_total),
+      year_built: num(form.year_built),
+      building_type: form.building_type || null,
+      condition: form.condition || null,
+      description: form.description || null,
+      heating_type: form.heating_type || null,
+      balcony: form.balcony || null,
+      parking: form.parking || null,
+      furniture: form.furniture || null,
+      appliances: form.appliances || null,
+      kids_allowed: form.kids_allowed,
+      pets_allowed: form.pets_allowed,
+      deposit: num(form.deposit),
+      utilities_included: form.utilities_included,
+      bathroom: form.bathroom || null,
+      ceiling_height: num(form.ceiling_height),
+      documents: form.documents || null,
+      plot_area: num(form.plot_area),
+      features: form.features,
+    } as any;
+  };
+
+  // Lazily create a draft so the user can add photos before explicitly saving.
+  // Stays on the same screen — just remembers the new id locally.
+  const ensureDraft = async (): Promise<number | null> => {
+    if (propId != null) return propId;
+    if (!form.price_value || !form.address) {
+      showToast('Спочатку вкажіть адресу і ціну — тоді можна додавати фото');
+      return null;
+    }
+    try {
+      const r = await api.createProperty(buildBody(false));
+      setCreatedId(r.id);
+      // Reflect the new id in the URL via React Router so back/refresh work,
+      // and flag the next useEffect run to skip refetching (we already have
+      // the freshest form state in memory).
+      justCreated.current = true;
+      navigate(`/edit/${r.id}`, { replace: true });
+      showToast('Чорнетку створено');
+      return r.id;
+    } catch (e: any) {
+      showToast(e?.message ?? 'Не вдалося створити чорнетку');
+      return null;
+    }
+  };
+
   const save = async (publish = false) => {
     if (!form.price_value || !form.address) {
       showToast('Заповніть адресу та ціну');
@@ -162,49 +245,11 @@ export function PropertyEditScreen() {
     }
     setSaving(true);
     try {
-      const num = (s: string) => s ? Number(s) : null;
-      const body: any = {
-        type: form.type,
-        deal: form.deal,
-        status: publish ? 'active' : form.status,
-        price_value: Number(form.price_value),
-        price_currency: form.price_currency,
-        price_value_secondary: form.price_value_secondary ? Number(form.price_value_secondary) : null,
-        price_currency_secondary: form.price_currency === 'USD' ? 'UAH' : 'USD',
-        address: form.address.trim(),
-        district: form.district || null,
-        complex_name: form.complex_name || null,
-        lat: form.lat, lng: form.lng,
-        area_total: num(form.area_total),
-        area_living: num(form.area_living),
-        area_kitchen: num(form.area_kitchen),
-        rooms: num(form.rooms),
-        floor: num(form.floor),
-        floors_total: num(form.floors_total),
-        year_built: num(form.year_built),
-        building_type: form.building_type || null,
-        condition: form.condition || null,
-        description: form.description || null,
-        heating_type: form.heating_type || null,
-        balcony: form.balcony || null,
-        parking: form.parking || null,
-        furniture: form.furniture || null,
-        appliances: form.appliances || null,
-        kids_allowed: form.kids_allowed,
-        pets_allowed: form.pets_allowed,
-        deposit: num(form.deposit),
-        utilities_included: form.utilities_included,
-        bathroom: form.bathroom || null,
-        ceiling_height: num(form.ceiling_height),
-        documents: form.documents || null,
-        plot_area: num(form.plot_area),
-        features: form.features,
-      };
-
+      const body = buildBody(publish);
       let pid: number;
-      if (editing) {
-        await api.updateProperty(Number(id), body);
-        pid = Number(id);
+      if (propId != null) {
+        await api.updateProperty(propId, body);
+        pid = propId;
       } else {
         const r = await api.createProperty(body);
         pid = r.id;
@@ -221,16 +266,12 @@ export function PropertyEditScreen() {
   };
 
   const onFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !editing) {
-      if (!editing) {
-        showToast('Спочатку збережіть чорнетку, потім завантажуйте фото');
-        return;
-      }
-      return;
-    }
+    if (!files || files.length === 0) return;
+    const pid = await ensureDraft();
+    if (!pid) return;
     setUploading(true);
     try {
-      const r = await api.uploadPhotos(Number(id), Array.from(files));
+      const r = await api.uploadPhotos(pid, Array.from(files));
       setPhotos((prev) => [...prev, ...r.photos]);
       tgHaptic('success');
     } catch (e: any) {
@@ -241,15 +282,31 @@ export function PropertyEditScreen() {
   };
 
   const removePhoto = async (photoId: number) => {
+    if (propId == null) return;
     const ok = await tgConfirm('Видалити це фото?');
     if (!ok) return;
-    await api.deletePhoto(Number(id), photoId);
-    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    try {
+      await api.deletePhoto(propId, photoId);
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      showToast('Фото видалено');
+    } catch (err: any) {
+      showToast(`Не вдалося видалити${err?.status ? ` (${err.status})` : ''}`);
+    }
   };
 
   const setCover = async (photoId: number) => {
-    await api.setCover(Number(id), photoId);
-    setPhotos((prev) => prev.map((p) => ({ ...p, is_cover: p.id === photoId })));
+    if (propId == null) return;
+    // Optimistic update so the user sees the change instantly
+    const prev = photos;
+    setPhotos((arr) => arr.map((p) => ({ ...p, is_cover: p.id === photoId })));
+    try {
+      await api.setCover(propId, photoId);
+      tgHaptic('success');
+      showToast('Встановлено як обкладинку');
+    } catch (err: any) {
+      setPhotos(prev); // revert
+      showToast(`Не вдалося встановити обкладинку${err?.status ? ` (${err.status})` : ''}`);
+    }
   };
 
   const addFeature = () => {
@@ -262,16 +319,17 @@ export function PropertyEditScreen() {
   const removeFeature = (f: string) => upd('features', form.features.filter((x) => x !== f));
 
   const remove = async () => {
+    if (propId == null) return;
     const ok = await tgConfirm('Видалити об\'єкт повністю?');
     if (!ok) return;
-    await api.deleteProperty(Number(id));
+    await api.deleteProperty(propId);
     showToast('Видалено');
     navigate('/dashboard');
   };
 
   return (
     <div className="tg">
-      <Header title={editing ? "Редагувати об'єкт" : "Новий об'єкт"}/>
+      <Header title={isEditing ? "Редагувати об'єкт" : "Новий об'єкт"}/>
       <div className="tg-body" style={{ padding: '8px 16px 24px' }}>
 
         <div className="eyebrow" style={{ padding: '12px 4px' }}>Тип</div>
@@ -396,14 +454,14 @@ export function PropertyEditScreen() {
           <label className="label">Тип будинку</label>
           <select className="input" value={form.building_type} onChange={(e) => upd('building_type', e.target.value)}>
             <option value="">—</option>
-            {BUILDING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {BUILDING_TYPES.map((t) => <option key={t} value={t}>{cap(t)}</option>)}
           </select>
         </div>
         <div className="field">
           <label className="label">Стан</label>
           <select className="input" value={form.condition} onChange={(e) => upd('condition', e.target.value)}>
             <option value="">—</option>
-            {CONDITIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+            {CONDITIONS.map((t) => <option key={t} value={t}>{cap(t)}</option>)}
           </select>
         </div>
 
@@ -503,19 +561,29 @@ export function PropertyEditScreen() {
         <div className="eyebrow" style={{ padding: '24px 4px 8px' }}>
           Фото {photos.length > 0 && <span style={{ color: 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>· {photos.length} / 50</span>}
         </div>
-        {!editing && (
+        {!isEditing && (
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '0 4px 10px' }}>
-            Фото можна додати після збереження чорнетки.
+            Завантажте перше фото — чорнетка створиться автоматично.
+          </div>
+        )}
+        {isEditing && photos.length > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '0 4px 8px' }}>
+            Натисніть «Обкладинка», щоб обрати головне фото оголошення.
           </div>
         )}
         <div className="photo-grid" style={{ padding: 0 }}>
           {photos.map((p) => (
             <div key={p.id} className={`cell ${p.is_cover ? 'cover' : ''}`}>
-              <img src={p.thumb_url ?? p.url} alt="" onClick={() => setCover(p.id)}/>
+              <img src={p.thumb_url ?? p.url} alt=""/>
               <button className="remove" onClick={() => removePhoto(p.id)}><IconTrash width={12} height={12}/></button>
+              {p.is_cover ? (
+                <div className="cover-badge active">✓ Обкладинка</div>
+              ) : (
+                <button className="cover-badge" onClick={() => setCover(p.id)}>📌 Обкладинка</button>
+              )}
             </div>
           ))}
-          {editing && photos.length < 50 && (
+          {photos.length < 50 && (
             <button className="add" onClick={() => fileRef.current?.click()} disabled={uploading}>
               <IconPlus width={28} height={28}/>
             </button>
@@ -532,7 +600,7 @@ export function PropertyEditScreen() {
           <button className="btn btn-secondary" onClick={() => save(false)} disabled={saving}>
             Зберегти як чорнетку
           </button>
-          {editing && (
+          {isEditing && (
             <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={remove}>
               Видалити об'єкт
             </button>

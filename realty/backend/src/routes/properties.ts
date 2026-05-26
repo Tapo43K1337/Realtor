@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query } from '../db.js';
 import { requireAuth, requireRealtor } from '../auth.js';
 import { getLatestRate, convert } from '../services/nbu.js';
+import { config } from '../config.js';
 
 const Status = z.enum(['draft', 'active', 'reserved', 'sold_rented', 'withdrawn']);
 const Type = z.enum(['apartment', 'house', 'commercial', 'land']);
@@ -380,5 +381,108 @@ export async function propertyRoutes(app: FastifyInstance) {
       [id, clientId]
     );
     return { ok: true };
+  });
+
+  // Prepare a rich shareable message via Telegram Bot API (savePreparedInlineMessage).
+  // Returns an id that the WebApp passes to Telegram.WebApp.shareMessage(id) to open
+  // a native share picker with a photo + caption + "Відкрити об'єкт" button.
+  app.post('/:id/prepare-share', { preHandler: requireAuth }, async (req: any, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return reply.code(400).send({ error: 'bad_id' });
+
+    const r = await query<any>(
+      `SELECT p.id, p.address, p.district, p.type, p.deal, p.description,
+              p.price_value, p.price_currency, p.area_total, p.rooms,
+              (SELECT filename FROM property_photos
+               WHERE property_id = p.id
+               ORDER BY is_cover DESC, sort_order ASC, id ASC LIMIT 1) AS cover_filename
+       FROM properties p WHERE p.id = $1`,
+      [id]
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: 'not_found' });
+    const p = r.rows[0];
+
+    // Telegram needs a publicly reachable HTTPS URL for the photo
+    const base = (config.appUrl || '').replace(/\/+$/, '');
+    if (!base) return reply.code(500).send({ error: 'app_url_not_configured' });
+    const photoUrl = p.cover_filename ? `${base}/uploads/properties/${p.id}/${p.cover_filename}` : null;
+
+    const priceStr = p.price_currency === 'USD'
+      ? `$${Math.round(Number(p.price_value)).toLocaleString('en-US')}`
+      : `${Math.round(Number(p.price_value)).toLocaleString('uk-UA').replace(/,/g, ' ')} ₴`;
+    const typeStr = p.type === 'house' ? 'Будинок' : p.type === 'apartment' ? 'Квартира' : p.type === 'commercial' ? 'Комерція' : 'Ділянка';
+    const dealStr = p.deal === 'rent' ? 'оренда' : 'продаж';
+    const title = `${typeStr} · ${dealStr}`;
+    const addr = [p.address, p.district].filter(Boolean).join(' · ');
+    const stats = [
+      p.rooms ? `${p.rooms} кімн.` : null,
+      p.area_total ? `${p.area_total} м²` : null,
+    ].filter(Boolean).join(' · ');
+    const desc = (p.description || '').replace(/<[^>]+>/g, '').slice(0, 350);
+    const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const captionLines = [
+      `<b>${escape(title)} — ${escape(priceStr)}</b>`,
+      escape(addr),
+      stats ? escape(stats) : '',
+      '',
+      desc ? escape(desc) : '',
+    ].filter(Boolean);
+    const caption = captionLines.join('\n').slice(0, 1024); // Telegram caption limit
+
+    // Bot username — required to build the Mini App deep link
+    const meRes = await fetch(`https://api.telegram.org/bot${config.botToken}/getMe`).then((r) => r.json()).catch(() => null) as any;
+    const botUsername = meRes?.result?.username;
+    if (!botUsername) return reply.code(500).send({ error: 'bot_unreachable' });
+
+    const openUrl = `https://t.me/${botUsername}/app?startapp=property_${p.id}`;
+    const inlineResult: any = photoUrl
+      ? {
+          type: 'photo',
+          id: `prop_${p.id}_${Date.now()}`,
+          photo_url: photoUrl,
+          thumbnail_url: photoUrl,
+          title: `${title} — ${priceStr}`,
+          description: addr,
+          caption,
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: "🏠 Відкрити об'єкт", url: openUrl }]],
+          },
+        }
+      : {
+          type: 'article',
+          id: `prop_${p.id}_${Date.now()}`,
+          title: `${title} — ${priceStr}`,
+          description: addr,
+          input_message_content: {
+            message_text: caption + `\n\n${openUrl}`,
+            parse_mode: 'HTML',
+          },
+          reply_markup: {
+            inline_keyboard: [[{ text: "🏠 Відкрити об'єкт", url: openUrl }]],
+          },
+        };
+
+    const prep = await fetch(
+      `https://api.telegram.org/bot${config.botToken}/savePreparedInlineMessage`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          user_id: Number(req.user.tgId.toString()),
+          result: inlineResult,
+          allow_user_chats: true,
+          allow_bot_chats: false,
+          allow_group_chats: true,
+          allow_channel_chats: true,
+        }),
+      }
+    ).then((r) => r.json()).catch(() => null) as any;
+
+    if (!prep?.ok) {
+      req.log?.warn({ prep }, 'savePreparedInlineMessage failed');
+      return reply.code(502).send({ error: 'prepare_failed', detail: prep?.description });
+    }
+    return { id: prep.result.id, expiration_date: prep.result.expiration_date };
   });
 }

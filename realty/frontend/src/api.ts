@@ -14,19 +14,36 @@ export function getToken(): string | null {
   return TOKEN;
 }
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+// Optional re-login hook: when a request returns 401 we try this once and retry.
+// SessionProvider wires it up so the user doesn't get stuck on an expired token.
+let reauth: (() => Promise<string | null>) | null = null;
+export function setReauth(fn: (() => Promise<string | null>) | null) { reauth = fn; }
+
+async function doFetch(path: string, init: RequestInit, token: string | null): Promise<Response> {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     ...(init.headers as Record<string, string> | undefined),
   };
-  if (TOKEN) headers['authorization'] = `Bearer ${TOKEN}`;
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  if (token) headers['authorization'] = `Bearer ${token}`;
+  return fetch(`${API_URL}${path}`, { ...init, headers });
+}
+
+async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+  let res = await doFetch(path, init, TOKEN);
+  if (res.status === 401 && reauth && !path.startsWith('/auth/')) {
+    // Try to silently re-issue the token via Telegram initData, then retry once.
+    const fresh = await reauth().catch(() => null);
+    if (fresh) res = await doFetch(path, init, fresh);
+  }
   if (res.status === 401) {
     setToken(null);
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(text || `HTTP ${res.status}`);
+    const err = new Error(text || `HTTP ${res.status}`) as Error & { status?: number; body?: string };
+    err.status = res.status;
+    err.body = text;
+    throw err;
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -75,6 +92,9 @@ export const api = {
   shareProperty: (id: number) =>
     req<{ ok: true }>(`/properties/${id}/share`, { method: 'POST' }),
 
+  preparePropertyShare: (id: number) =>
+    req<{ id: string; expiration_date: number }>(`/properties/${id}/prepare-share`, { method: 'POST' }),
+
   // Photos
   uploadPhotos: (propertyId: number, files: File[]) => {
     const fd = new FormData();
@@ -104,7 +124,7 @@ export const api = {
   // Viewings
   createViewing: (body: {
     property_id: number;
-    scheduled_at: string;
+    scheduled_at: string | null;
     name: string;
     phone: string;
     note?: string;

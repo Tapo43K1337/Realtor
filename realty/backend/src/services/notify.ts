@@ -25,12 +25,21 @@ async function tgSend(chatId: bigint | string, text: string, extra: Record<strin
   }
 }
 
+function fmtWhen(d: Date | null): string {
+  if (!d) return 'час не вказано — узгодьте з клієнтом';
+  return new Date(d).toLocaleString('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
 export async function notifyRealtorsNewViewing(viewingId: number) {
   const r = await query<{
     address: string;
     price_value: string;
     price_currency: string;
-    scheduled_at: Date;
+    scheduled_at: Date | null;
     client_name: string;
     client_phone: string;
     client_username: string | null;
@@ -46,16 +55,11 @@ export async function notifyRealtorsNewViewing(viewingId: number) {
   );
   if (r.rowCount === 0) return;
   const v = r.rows[0];
-  const when = new Date(v.scheduled_at).toLocaleString('uk-UA', {
-    timeZone: 'Europe/Kyiv',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
   const text =
     `🆕 <b>Нова заявка на перегляд</b>\n` +
     `📍 ${v.address}\n` +
     `💰 ${v.price_value} ${v.price_currency}\n` +
-    `📅 ${when}\n` +
+    `📅 ${fmtWhen(v.scheduled_at)}\n` +
     `👤 ${v.client_name}\n` +
     `📞 ${v.client_phone}` +
     (v.client_username ? `\n✈️ @${v.client_username}` : '') +
@@ -69,7 +73,7 @@ export async function notifyRealtorsNewViewing(viewingId: number) {
 export async function notifyRealtorsCancelled(viewingId: number) {
   const r = await query<{
     address: string;
-    scheduled_at: Date;
+    scheduled_at: Date | null;
     client_name: string;
     client_phone: string;
   }>(
@@ -81,15 +85,13 @@ export async function notifyRealtorsCancelled(viewingId: number) {
   );
   if (r.rowCount === 0) return;
   const v = r.rows[0];
-  const when = new Date(v.scheduled_at).toLocaleString('uk-UA', {
-    timeZone: 'Europe/Kyiv',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  const whenLine = v.scheduled_at
+    ? `📅 був на ${fmtWhen(v.scheduled_at)}\n`
+    : '';
   const text =
     `❌ <b>Клієнт скасував перегляд</b>\n` +
     `📍 ${v.address}\n` +
-    `📅 був на ${when}\n` +
+    whenLine +
     `👤 ${v.client_name}\n` +
     `📞 ${v.client_phone}`;
 

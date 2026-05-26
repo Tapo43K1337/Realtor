@@ -56,7 +56,9 @@ input:focus, textarea:focus, select:focus { outline: none; }
 
 .tg-head{
   position: sticky; top: 0;
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  /* max(env, tg-safe) avoids double-counting the status bar height; tg-content-top
+     adds the height of Telegram's floating chrome (Close pill, ... menu) on top. */
+  padding: calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-top) + 12px) 16px 12px;
   display: grid;
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
@@ -71,7 +73,7 @@ input:focus, textarea:focus, select:focus { outline: none; }
   border-bottom: 0.5px solid var(--hair-2);
 }
 .tg-head.dark{ background:#0c0c0c; color:#fff; }
-.tg-head.over{ background:transparent; position:absolute; top:0; left:0; right:0; border-bottom:0; }
+.tg-head.over{ background:transparent; position:absolute; top:0; left:0; right:0; border-bottom:0; padding-top: calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-top) + 12px); }
 .tg-back{
   width:34px; height:34px; border-radius: 50%;
   display:flex; align-items:center; justify-content:center;
@@ -432,11 +434,13 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .leaflet-control-attribution { font-size: 9px; }
 .leaflet-pin-marker{
   background: var(--ink); color:#fff;
-  font-size: 12px; font-weight: 600;
-  padding: 6px 10px; border-radius: 100px;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 5px 9px; border-radius: 100px;
   box-shadow: 0 2px 6px rgba(20,19,15,0.25);
   white-space:nowrap;
   border: 1.5px solid #fff;
+  display: inline-block;
+  width: max-content;
 }
 
 /* Photo grid uploader */
@@ -452,11 +456,20 @@ input:focus, textarea:focus, select:focus { outline: none; }
   background: rgba(20,19,15,0.7); color: #fff;
   font-size: 13px; display: flex; align-items: center; justify-content: center;
 }
-.photo-grid .cell.cover::before{
-  content: 'Обкладинка'; position: absolute; bottom: 4px; left: 4px;
-  font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-  background: rgba(255,255,255,0.92); padding: 3px 6px; border-radius: 4px;
+/* "Обкладинка" pill — clickable on non-cover cells, static badge on the cover */
+.photo-grid .cell .cover-badge{
+  position: absolute; bottom: 4px; left: 4px; right: 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  background: rgba(255,255,255,0.92); color: var(--ink);
+  padding: 5px 8px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  border: 0; cursor: pointer;
+  text-align: center;
 }
+.photo-grid .cell .cover-badge.active{
+  background: var(--ink); color: #fff; cursor: default;
+}
+.photo-grid .cell .cover-badge:not(.active):active{ background: #fff; transform: scale(0.98); }
 .photo-grid .add{
   display: flex; align-items: center; justify-content: center;
   aspect-ratio: 1/1; border: 1.5px dashed rgba(20,19,15,0.2);
@@ -469,6 +482,10 @@ input:focus, textarea:focus, select:focus { outline: none; }
   padding: 48px 24px; text-align: center; color: var(--muted);
 }
 .center-state .t{ font-size: 18px; font-family: var(--font-display); color: var(--ink); margin-bottom: 6px; }
+
+/* Hero photo carousel on Detail screen — hide native scrollbar */
+.hero-strip{ scrollbar-width: none; }
+.hero-strip::-webkit-scrollbar{ display: none; }
 
 /* Toast */
 .toast{
@@ -515,11 +532,12 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .gallery-overlay{ position: fixed; inset: 0; background: #000; z-index: 1500; display: flex; flex-direction: column; }
 .gallery-overlay .image-area{ flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
 .gallery-overlay img{ max-width: 100%; max-height: 100%; object-fit: contain; }
-/* Position the close button below Telegram's own back button (which sits at the
-   very top of the chrome) so the two don't overlap. */
+/* Sit just under Telegram's chrome (Back / Close pill) — using only the
+   Telegram-reported insets keeps the close button at the very top of the photo,
+   so it doesn't drift toward the middle of the screen on tall photos. */
 .gallery-overlay .top{
   position: absolute; top: 0; left: 0; right: 0;
-  padding: calc(env(safe-area-inset-top) + var(--tg-safe-top) + var(--tg-content-top) + 56px) 16px 12px;
+  padding: calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-top) + 8px) 16px 12px;
   color: #fff; display: flex; align-items: center; justify-content: space-between; z-index: 2;
   background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
   pointer-events: none;

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { TgHeader } from '../components';
 import { I } from '../icons';
 import { UA } from '../data/ua';
+import { cap } from '../utils/format';
 import type { Currency, DealType, PropertyType } from '../types';
 
 const BUILDING_TYPES = ['новобудова', 'сталінка', 'хрущовка', 'чешка', 'вторинка', 'інше'] as const;
@@ -155,7 +156,7 @@ export function FiltersScreen() {
                 key={b}
                 className={'chip ' + (buildingType === b ? 'solid' : '')}
                 onClick={() => setBuildingType(buildingType === b ? '' : b)}
-              >{b}</button>
+              >{cap(b)}</button>
             ))}
           </div>
         </Section>
@@ -168,7 +169,7 @@ export function FiltersScreen() {
                 key={c}
                 className={'chip ' + (condition === c ? 'solid' : '')}
                 onClick={() => setCondition(condition === c ? '' : c)}
-              >{c}</button>
+              >{cap(c)}</button>
             ))}
           </div>
         </Section>

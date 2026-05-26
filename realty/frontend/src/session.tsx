@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, setToken, getToken } from './api';
+import { api, setToken, getToken, setReauth } from './api';
 import { getInitData, tg } from './tg';
 import type { Session } from './types';
 
@@ -64,6 +64,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
+    // Silent re-login hook for the API client — if a request returns 401, the
+    // client calls this to mint a fresh JWT from Telegram initData and retries.
+    setReauth(async () => {
+      const initData = getInitData();
+      if (!initData) return null;
+      try {
+        const s = await api.login(initData);
+        setToken(s.token);
+        setSession(s);
+        return s.token;
+      } catch {
+        return null;
+      }
+    });
+    return () => setReauth(null);
   }, []);
 
   return (

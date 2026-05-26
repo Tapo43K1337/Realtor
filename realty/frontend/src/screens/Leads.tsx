@@ -40,7 +40,9 @@ export function LeadsScreen() {
             <div key={v.id} className="card-flat" style={{ padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                  {new Date(v.scheduled_at).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })}
+                  {v.scheduled_at
+                    ? new Date(v.scheduled_at).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })
+                    : 'Час не вказано'}
                 </div>
                 <div style={{ fontSize: 12, color: v.status === 'pending' ? 'var(--accent)' : 'var(--muted)' }}>
                   {v.status === 'pending' ? 'НОВА' : v.status === 'done' ? 'ЗАВЕРШЕНО' : 'СКАСОВАНО'}
@@ -72,9 +74,15 @@ export function LeadsScreen() {
                   )}
                   <button className="btn btn-sm btn-primary"
                           onClick={async () => {
-                            await api.markViewingDone(v.id);
-                            showToast('Помічено як завершене');
-                            load();
+                            try {
+                              await api.markViewingDone(v.id);
+                              showToast('Помічено як завершене');
+                              load();
+                            } catch (err: any) {
+                              const status = err?.status;
+                              if (status === 401) showToast('Сесія застаріла, перезайдіть');
+                              else showToast(`Не вдалося завершити${status ? ` (${status})` : ''}`);
+                            }
                           }}>
                     Завершити
                   </button>
@@ -82,9 +90,15 @@ export function LeadsScreen() {
                           onClick={async () => {
                             const ok = await tgConfirm('Скасувати заявку?');
                             if (!ok) return;
-                            await api.cancelViewing(v.id);
-                            showToast('Скасовано');
-                            load();
+                            try {
+                              await api.cancelViewing(v.id);
+                              showToast('Скасовано');
+                              load();
+                            } catch (err: any) {
+                              const status = err?.status;
+                              if (status === 401) showToast('Сесія застаріла, перезайдіть');
+                              else showToast(`Не вдалося скасувати${status ? ` (${status})` : ''}`);
+                            }
                           }}>
                     Скасувати
                   </button>

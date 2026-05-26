@@ -71,7 +71,7 @@ export type Property = {
 
 export type Viewing = {
   id: number;
-  scheduled_at: string;
+  scheduled_at: string | null;
   status: 'pending' | 'cancelled_by_client' | 'done';
   client_name: string;
   client_phone: string;

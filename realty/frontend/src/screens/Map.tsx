@@ -12,11 +12,11 @@ import { UA } from '../data/ua';
 const DNIPRO: [number, number] = [48.4647, 35.0462];
 
 function makeMarker(label: string, active = false) {
-  // Estimate width from label length so the pill fits the text without clipping.
-  // Leaflet positions the icon based on iconSize/iconAnchor — using realistic
-  // values keeps the pill centered over the actual lat/lng.
-  const approxW = Math.max(56, label.length * 8 + 22);
-  const approxH = 30;
+  // Pill width is dictated by CSS (`width: max-content`) so it hugs the text.
+  // Leaflet still needs an approximate iconSize for anchoring — slight under-
+  // estimate is fine, the pill is `inline-block` and grows over its anchor box.
+  const approxW = label.length * 7 + 18;
+  const approxH = 24;
   return L.divIcon({
     className: 'leaflet-pin-wrap',
     html: `<div class="leaflet-pin-marker${active ? ' active' : ''}">${label}</div>`,
@@ -65,7 +65,8 @@ export function MapScreen() {
     <div className="tg" style={{ background: '#E8E3D8' }}>
       {/* Top floating chrome */}
       <div style={{
-        position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)',
+        position: 'absolute',
+        top: 'calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-top) + 12px)',
         left: 16, right: 16, display: 'flex', gap: 10, zIndex: 600,
       }}>
         <button

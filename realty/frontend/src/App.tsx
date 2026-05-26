@@ -52,7 +52,7 @@ function Shell() {
   if (loading) return <Loading/>;
   const role = session?.user.role;
 
-  const showTabs = !['/gallery', '/book', '/edit', '/filters', '/agent-profile'].some((p) => loc.pathname.startsWith(p));
+  const showTabs = !['/gallery', '/book', '/edit', '/filters', '/agent-profile', '/property/'].some((p) => loc.pathname.startsWith(p));
 
   return (
     <div className="app">

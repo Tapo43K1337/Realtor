@@ -234,7 +234,11 @@ export function ListingRow({ property, mainCurrency = 'USD', saved, onClick, onF
   const usd = priceInUsd(property.price_value, property.price_currency);
   const uah = priceInUah(property.price_value, property.price_currency);
   const main = mainCurrency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
-  const perM2 = property.area_total ? Math.round(uah / property.area_total) : 0;
+  // Price-per-m² only makes sense for sales — for rent it'd mix monthly rate with
+  // total area and produce a misleading number, so hide it.
+  const perM2 = property.deal === 'sale' && property.area_total
+    ? Math.round(uah / property.area_total)
+    : 0;
   return (
     <div className="card" style={{ display: 'flex', gap: 12, padding: 10, cursor: 'pointer' }} onClick={onClick}>
       <div style={{ width: 130, flexShrink: 0 }}>
@@ -310,11 +314,14 @@ export function SectionHeader({ title, action, onAction }: { title: string; acti
   return (
     <div className="sec-h" style={{ marginTop: 24, marginBottom: 12 }}>
       <div className="t">{title}</div>
-      {action && (
+      {action && (onAction ? (
         <button className="a" style={{ display: 'flex', alignItems: 'center', gap: 2 }} onClick={onAction}>
           {action} {I.chev({ s: 12 })}
         </button>
-      )}
+      ) : (
+        // No handler — render as plain text so it doesn't look like a tappable link.
+        <span className="a">{action}</span>
+      ))}
     </div>
   );
 }

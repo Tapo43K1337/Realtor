@@ -61,7 +61,9 @@ export function ProfileScreen() {
           {viewings.map((v) => (
             <div key={v.id} className="card-flat" style={{ padding: 14 }} onClick={() => navigate(`/property/${v.property_id}`)}>
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                {new Date(v.scheduled_at).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })}
+                {v.scheduled_at
+                  ? new Date(v.scheduled_at).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' })
+                  : 'Час узгодить ріелтор'}
                 {v.status === 'cancelled_by_client' && ' · скасовано'}
                 {v.status === 'done' && ' · завершено'}
               </div>

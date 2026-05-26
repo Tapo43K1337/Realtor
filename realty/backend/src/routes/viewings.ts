@@ -8,7 +8,10 @@ const MIN_HOURS_AHEAD = 2;
 
 const createBody = z.object({
   property_id: z.number().int().positive(),
-  scheduled_at: z.string().datetime(),
+  // scheduled_at is now optional — the form no longer asks for a preferred time,
+  // the realtor calls the client back to arrange it. Kept here for callers that
+  // still want to pass it (e.g. a future "preferred time" UI).
+  scheduled_at: z.string().datetime().optional().nullable(),
   name: z.string().min(1).max(120),
   phone: z.string().min(5).max(40),
   note: z.string().max(500).optional().nullable(),
@@ -23,10 +26,14 @@ export async function viewingRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     const d = parsed.data;
 
-    const at = new Date(d.scheduled_at);
-    const hours = (at.getTime() - Date.now()) / 36e5;
-    if (hours < MIN_HOURS_AHEAD) {
-      return reply.code(400).send({ error: 'too_soon', min_hours: MIN_HOURS_AHEAD });
+    let scheduledIso: string | null = null;
+    if (d.scheduled_at) {
+      const at = new Date(d.scheduled_at);
+      const hours = (at.getTime() - Date.now()) / 36e5;
+      if (hours < MIN_HOURS_AHEAD) {
+        return reply.code(400).send({ error: 'too_soon', min_hours: MIN_HOURS_AHEAD });
+      }
+      scheduledIso = at.toISOString();
     }
 
     // Property must be active
@@ -50,7 +57,7 @@ export async function viewingRoutes(app: FastifyInstance) {
     const r = await query<{ id: number }>(
       `INSERT INTO viewings (property_id, client_id, agent_id, scheduled_at, client_name, client_phone, note)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [d.property_id, req.user.clientId, prop.rows[0].created_by, at.toISOString(), d.name, d.phone, d.note ?? null]
+      [d.property_id, req.user.clientId, prop.rows[0].created_by, scheduledIso, d.name, d.phone, d.note ?? null]
     );
 
     // Fire-and-forget notification to realtors
