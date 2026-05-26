@@ -78,10 +78,6 @@ export function useSession() {
 }
 
 export function applyTelegramTheme() {
-  if (!tg) return;
-  if (tg.colorScheme === 'dark') {
-    document.body.classList.add('tg-dark');
-  } else {
-    document.body.classList.remove('tg-dark');
-  }
+  // Design is always light cream — ignore Telegram's color scheme.
+  document.body.classList.remove('tg-dark');
 }

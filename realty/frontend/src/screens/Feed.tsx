@@ -1,27 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, fmtPrice, fmtPriceShort, fmtM2 } from '../api';
-import type { Property, Filters, Currency } from '../types';
-import { IconHeart, IconHeartFilled, IconSearch, IconFilter, IconPin } from '../icons';
+import { api } from '../api';
+import type { Property, Currency, DealType } from '../types';
 import { useSession } from '../session';
-import { showToast } from '../components';
+import {
+  TgHeader, TabBar, BldgImage, ListingCardLg, ListingCard, ListingRow, SectionHeader,
+  showToast,
+} from '../components';
+import { I } from '../icons';
+import { UA, coverVariant } from '../data/ua';
+import { setUsdUahRate } from '../utils/format';
+
+type Op = 'buy' | 'rent' | 'daily';
+const OP_TO_DEAL: Record<Op, DealType | undefined> = { buy: 'sale', rent: 'rent', daily: undefined };
 
 export function FeedScreen() {
   const navigate = useNavigate();
   const { session } = useSession();
   const [items, setItems] = useState<Property[] | null>(null);
+  const [op, setOp] = useState<Op>('buy');
+  const [district, setDistrict] = useState<string | undefined>(undefined);
   const [query, setQuery] = useState('');
-  const [deal, setDeal] = useState<'sale' | 'rent' | undefined>(undefined);
-  const [currency, setCurrency] = useState<Currency>('USD');
   const [favIds, setFavIds] = useState<Set<number>>(new Set());
+  const mainCurrency: Currency = 'USD'; // primary currency for display; UAH shown as ≈
 
+  // Load properties
   useEffect(() => {
-    const f: Filters & { limit: number } = { limit: 40, currency };
-    if (query) f.q = query;
+    const f: any = { limit: 40, status: 'active' };
+    const deal = OP_TO_DEAL[op];
     if (deal) f.deal = deal;
-    api.listProperties(f).then((r) => setItems(r.items)).catch(() => setItems([]));
-  }, [query, deal, currency]);
+    if (district) f.district = district;
+    if (query) f.q = query;
+    if (op === 'daily') { setItems([]); return; } // not supported yet
+    api.listProperties(f).then((r) => {
+      setItems(r.items);
+      if (r.rate) setUsdUahRate(r.rate);
+    }).catch(() => setItems([]));
+  }, [op, district, query]);
 
+  // Load favorites for client
   useEffect(() => {
     if (session?.user.role === 'client') {
       api.listFavorites().then((r) => setFavIds(new Set(r.items.map((i: any) => i.id)))).catch(() => {});
@@ -36,111 +53,195 @@ export function FeedScreen() {
     } else {
       await api.addFavorite(id);
       setFavIds((s) => new Set(s).add(id));
-      showToast("Додано в обране");
+      showToast('Додано в обране');
     }
   };
 
+  const total = items?.length ?? 0;
+  const featured = items?.[0];
+  const newOnes = useMemo(() => items?.slice(1, 5) ?? [], [items]);
+  const more = useMemo(() => items?.slice(5, 11) ?? [], [items]);
+
+  const open = (id: number) => navigate(`/property/${id}`);
+
   return (
     <div className="tg">
-      <header className="tg-head">
-        <div style={{ flex: 1 }}>
-          <div className="eyebrow" style={{ marginBottom: 2 }}>Realty · Дніпро</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1 }}>
-            {session?.user.role === 'realtor' ? 'Огляд об\'єктів' : 'Знайдіть свій дім'}
-          </div>
-        </div>
-        <button className="tg-back" onClick={() => navigate('/filters')} aria-label="filters">
-          <IconFilter/>
-        </button>
-      </header>
+      <TgHeader title="Realty" sub={UA.city} onBack={false}
+        right={<button className="tg-back" aria-label="share">{I.share({ s: 16 })}</button>}/>
 
       <div className="tg-body">
-        <div style={{ padding: '8px 16px 12px' }}>
-          <div className="input">
-            <IconSearch width={18} height={18} stroke="var(--muted)"/>
+
+        {/* Operation segmented control */}
+        <div style={{ padding: '0 16px 4px' }}>
+          <div className="segment" style={{ height: 38 }}>
+            <button className={op === 'buy'   ? 'on' : ''} onClick={() => setOp('buy')}>Купити</button>
+            <button className={op === 'rent'  ? 'on' : ''} onClick={() => setOp('rent')}>Орендувати</button>
+            <button className={op === 'daily' ? 'on' : ''} onClick={() => setOp('daily')}>Подобово</button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div style={{ padding: '10px 16px 0' }}>
+          <div className="input" style={{ borderRadius: 14, height: 48 }}>
+            {I.search({ s: 18, c: '#9C9890', w: 1.8 })}
             <input
               type="search"
-              placeholder="Адреса, район, ЖК…"
+              placeholder="Адреса, ЖК або район"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              style={{ flex: 1, border: 0, background: 'transparent', height: '100%' }}
+              style={{ flex: 1, border: 0, background: 'transparent', height: '100%', minWidth: 0 }}
             />
+            <button style={{ color: 'var(--ink)' }} onClick={() => navigate('/filters')} aria-label="filters">
+              {I.slider({ s: 18, w: 1.8 })}
+            </button>
           </div>
         </div>
 
-        <div style={{ padding: '0 16px 12px' }}>
-          <div className="segment">
-            <button className={deal === undefined ? 'on' : ''} onClick={() => setDeal(undefined)}>Усі</button>
-            <button className={deal === 'sale' ? 'on' : ''} onClick={() => setDeal('sale')}>Купити</button>
-            <button className={deal === 'rent' ? 'on' : ''} onClick={() => setDeal('rent')}>Оренда</button>
+        {/* District chips */}
+        <div style={{ marginTop: 14 }}>
+          <div className="hscroll">
+            <button
+              className={'chip lg ' + (district === undefined ? 'solid' : '')}
+              onClick={() => setDistrict(undefined)}
+            >
+              {I.compass({ s: 14, c: district === undefined ? '#fff' : 'currentColor' })} Усі райони
+            </button>
+            {UA.districts.slice(0, 6).map((d) => (
+              <button
+                key={d}
+                className={'chip lg ' + (district === d ? 'solid' : '')}
+                onClick={() => setDistrict(district === d ? undefined : d)}
+              >{d}</button>
+            ))}
           </div>
         </div>
 
-        <div style={{ padding: '0 16px 12px', display: 'flex', justifyContent: 'flex-end' }}>
-          <div className="segment" style={{ width: 140 }}>
-            <button className={currency === 'USD' ? 'on' : ''} onClick={() => setCurrency('USD')}>USD</button>
-            <button className={currency === 'UAH' ? 'on' : ''} onClick={() => setCurrency('UAH')}>UAH</button>
+        {/* Eyebrow + featured */}
+        {featured && (
+          <>
+            <div style={{ padding: '24px 20px 12px' }}>
+              <div className="eyebrow">Підбірка тижня</div>
+              <div className="h-display" style={{ fontSize: 32, marginTop: 6 }}>
+                Преміум житло над<br/>правим берегом Дніпра
+              </div>
+            </div>
+            <div style={{ padding: '0 16px' }}>
+              <ListingCardLg
+                property={featured}
+                mainCurrency={mainCurrency}
+                onClick={() => open(featured.id)}
+                isFav={favIds.has(featured.id)}
+                onFav={() => toggleFav(featured.id)}
+              />
+            </div>
+          </>
+        )}
+
+        {/* New offers */}
+        {newOnes.length > 0 && (
+          <>
+            <SectionHeader title="Нові пропозиції" action={`Усі ${total}`} onAction={() => navigate('/filters')}/>
+            <div className="hscroll">
+              {newOnes.map((it) => (
+                <ListingCard
+                  key={it.id}
+                  property={it}
+                  mainCurrency={mainCurrency}
+                  w={230}
+                  onClick={() => open(it.id)}
+                  isFav={favIds.has(it.id)}
+                  onFav={() => toggleFav(it.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Category tiles */}
+        <SectionHeader title="За форматом"/>
+        <div style={{ padding: '0 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {([
+            { label: 'Новобудови', count: countBy(items, 'building_type', 'новобудова'), bg: 'cool' },
+            { label: 'Сталінки',  count: countBy(items, 'building_type', 'сталінка'),  bg: 'warm' },
+            { label: 'Будинки',   count: countBy(items, 'type', 'house'),              bg: 'clay' },
+            { label: 'Оренда',    count: countBy(items, 'deal', 'rent'),               bg: 'sand' },
+          ] as const).map((c) => (
+            <button
+              key={c.label}
+              style={{ position: 'relative', height: 110, borderRadius: 14, overflow: 'hidden', textAlign: 'left' }}
+              onClick={() => navigate('/filters')}
+            >
+              <BldgImage variant={c.bg as any} height={110} rounded={14}/>
+              <div style={{
+                position: 'absolute', inset: 0, padding: 12, display: 'flex', flexDirection: 'column',
+                justifyContent: 'flex-end', color: '#fff',
+                background: 'linear-gradient(180deg, rgba(20,19,15,0) 30%, rgba(20,19,15,0.55) 100%)',
+              }}>
+                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>{c.label}</div>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>{c.count} об'єктів</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Recent list */}
+        {more.length > 0 && (
+          <>
+            <SectionHeader title="Свіжі оголошення" action="Сортувати"/>
+            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {more.map((it) => (
+                <ListingRow
+                  key={it.id}
+                  property={it}
+                  mainCurrency={mainCurrency}
+                  saved={favIds.has(it.id)}
+                  onClick={() => open(it.id)}
+                  onFav={() => toggleFav(it.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Market pulse */}
+        <div style={{ padding: '24px 16px 0' }}>
+          <div className="card-flat" style={{ padding: 18 }}>
+            <div className="eyebrow">Ринок · {monthYear()}</div>
+            <div className="h-display" style={{ fontSize: 24, marginTop: 6 }}>
+              {UA.city} · {total} активних об'єктів
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+              Преміум, вторинний ринок та новобудови. Перегляди організуються через застосунок.
+            </div>
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: 14 }} onClick={() => navigate('/map')}>
+              Дивитися на карті {I.chev({ s: 12 })}
+            </button>
           </div>
         </div>
 
-        {items === null && <div className="center-state">Завантаження…</div>}
+        {items === null && (
+          <div className="center-state"><div className="t">Завантаження…</div></div>
+        )}
         {items?.length === 0 && (
           <div className="center-state">
             <div className="t">Поки нічого не знайдено</div>
             <div>Спробуйте змінити фільтри</div>
           </div>
         )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 16px' }}>
-          {items?.map((p) => {
-            const primaryMatches = p.price_currency === currency;
-            const mainPrice = primaryMatches ? p.price_value : (p.price_value_secondary ?? p.price_value);
-            const mainCur: Currency = primaryMatches ? p.price_currency : (p.price_currency_secondary ?? p.price_currency);
-            const cover = p.photos.find((ph) => ph.is_cover) ?? p.photos[0];
-
-            return (
-              <div key={p.id} className="prop-card" onClick={() => navigate(`/property/${p.id}`)}>
-                <div className="cover">
-                  {cover ? (
-                    <img src={cover.url} alt=""/>
-                  ) : (
-                    <div className="ph" style={{ width: '100%', height: '100%' }}/>
-                  )}
-                  <div className="badges">
-                    {p.deal === 'rent' && <div className="tag accent">Оренда</div>}
-                    {p.status === 'reserved' && <div className="tag gold">Зарезервовано</div>}
-                  </div>
-                  {session?.user.role === 'client' && (
-                    <button className="fav" onClick={(e) => { e.stopPropagation(); toggleFav(p.id); }}>
-                      {favIds.has(p.id) ? <IconHeartFilled width={18} height={18}/> : <IconHeart width={18} height={18}/>}
-                    </button>
-                  )}
-                </div>
-                <div className="body">
-                  <div className="price">{fmtPrice(mainPrice, mainCur)}</div>
-                  {p.price_value_secondary && (
-                    <div className="price-sec">
-                      ≈ {fmtPriceShort(
-                        primaryMatches ? p.price_value_secondary : p.price_value,
-                        primaryMatches ? (p.price_currency_secondary as Currency) : p.price_currency
-                      )}
-                    </div>
-                  )}
-                  <div className="addr" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <IconPin width={14} height={14} stroke="var(--muted)"/>
-                    {p.address}{p.district ? ` · ${p.district}` : ''}
-                  </div>
-                  <div className="meta">
-                    {p.rooms != null && <span>{p.rooms} кімн.</span>}
-                    {p.area_total != null && <span>{fmtM2(p.area_total)}</span>}
-                    {p.floor != null && p.floors_total != null && <span>{p.floor}/{p.floors_total} пов.</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
+
+      <TabBar active="home"/>
     </div>
   );
+}
+
+function countBy<T>(arr: T[] | null, key: keyof T, value: any): number {
+  if (!arr) return 0;
+  return arr.filter((x) => x[key] === value).length;
+}
+function monthYear(): string {
+  const d = new Date();
+  const months = ['січень', 'лютий', 'березень', 'квітень', 'травень', 'червень',
+                  'липень', 'серпень', 'вересень', 'жовтень', 'листопад', 'грудень'];
+  return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
