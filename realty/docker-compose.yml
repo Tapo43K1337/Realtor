@@ -1,0 +1,112 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      TZ: ${TZ}
+      API_PORT: ${API_PORT}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL: ${JWT_TTL}
+      BOT_TOKEN: ${BOT_TOKEN}
+      REALTOR_TG_IDS: ${REALTOR_TG_IDS}
+      UPLOADS_DIR: ${UPLOADS_DIR}
+      MAX_PHOTOS_PER_OBJECT: ${MAX_PHOTOS_PER_OBJECT}
+      PHOTO_MAX_SIZE_MB: ${PHOTO_MAX_SIZE_MB}
+      APP_URL: ${APP_URL}
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - "3001"
+
+  bot:
+    build: ./bot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      TZ: ${TZ}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      BOT_TOKEN: ${BOT_TOKEN}
+      REALTOR_TG_IDS: ${REALTOR_TG_IDS}
+      APP_URL: ${APP_URL}
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_BOT_USERNAME: ${VITE_BOT_USERNAME}
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - uploads:/app/uploads:ro
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      TZ: ${TZ}
+    volumes:
+      - ./backups:/backups
+      - uploads:/uploads:ro
+    entrypoint: >
+      sh -c '
+      apk add --no-cache tar gzip > /dev/null 2>&1;
+      while true; do
+        STAMP=$$(date +%Y%m%d_%H%M%S);
+        echo "[backup] starting $$STAMP";
+        pg_dump -h $$POSTGRES_HOST -U $$POSTGRES_USER -d $$POSTGRES_DB | gzip > /backups/db_$$STAMP.sql.gz;
+        tar czf /backups/uploads_$$STAMP.tar.gz -C /uploads . 2>/dev/null || true;
+        find /backups -name "db_*.sql.gz" -mtime +14 -delete;
+        find /backups -name "uploads_*.tar.gz" -mtime +14 -delete;
+        echo "[backup] done $$STAMP";
+        sleep 86400;
+      done'
+
+volumes:
+  db_data:
+  uploads:
