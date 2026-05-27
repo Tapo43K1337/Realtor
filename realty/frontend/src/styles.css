@@ -429,7 +429,8 @@ input:focus, textarea:focus, select:focus { outline: none; }
 /* ───── App-specific extensions ───── */
 
 /* Leaflet */
-.map-wrap{ height: calc(100vh - env(safe-area-inset-bottom) - 80px); position: relative; }
+/* Sizing/positioning is set inline on the .map-wrap div in Map.tsx so the map
+   extends behind the translucent tab bar — don't set height/position here. */
 .leaflet-container { background: #E8E3D8; font-family: var(--font-ui); }
 .leaflet-control-attribution { font-size: 9px; }
 .leaflet-pin-marker{
