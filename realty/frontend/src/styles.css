@@ -530,19 +530,17 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .filter-block .title{ font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 
 .gallery-overlay{ position: fixed; inset: 0; background: #000; z-index: 1500; display: flex; flex-direction: column; }
-.gallery-overlay .image-area{ flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
+.gallery-overlay .image-area{ flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; min-height: 0; }
 .gallery-overlay img{ max-width: 100%; max-height: 100%; object-fit: contain; }
-/* Sit just under Telegram's chrome (Back / Close pill) — using only the
-   Telegram-reported insets keeps the close button at the very top of the photo,
-   so it doesn't drift toward the middle of the screen on tall photos. */
+/* Header sits in normal flex flow so it doesn't overlay the photo (close button
+   used to land on top of tall portrait shots). The Telegram-reported insets
+   reserve space for the floating Back/Close pill. */
 .gallery-overlay .top{
-  position: absolute; top: 0; left: 0; right: 0;
+  flex: 0 0 auto;
   padding: calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-top) + 8px) 16px 12px;
-  color: #fff; display: flex; align-items: center; justify-content: space-between; z-index: 2;
-  background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
-  pointer-events: none;
+  color: #fff; display: flex; align-items: center; justify-content: space-between;
+  background: #000;
 }
-.gallery-overlay .top > *{ pointer-events: auto; }
 .gallery-overlay .top .close{
   width: 40px; height: 40px; border-radius: 50%;
   background: rgba(255,255,255,0.18); color: #fff;

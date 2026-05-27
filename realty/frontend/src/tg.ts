@@ -27,6 +27,8 @@ type Tg = {
   openLink(url: string): void;
   shareToStory?: (mediaUrl: string, opts?: any) => void;
   shareMessage?: (msgId: string, cb?: (sent: boolean) => void) => void;
+  disableVerticalSwipes?: () => void;
+  enableVerticalSwipes?: () => void;
   showAlert(text: string, cb?: () => void): void;
   showConfirm(text: string, cb: (ok: boolean) => void): void;
   showPopup(opts: any, cb?: (id: string) => void): void;
@@ -44,6 +46,11 @@ export function tgReady() {
   if (!tg) return;
   tg.ready();
   tg.expand();
+
+  // Stop Telegram from intercepting downward swipes to minimize/close the app.
+  // Our screens have their own pull/scroll gestures (bottom sheet on Detail,
+  // map pan, lists) that otherwise compete with Telegram's swipe-to-close.
+  try { tg.disableVerticalSwipes?.(); } catch { /* older clients */ }
 
   // Mark that we're running inside Telegram so CSS can add breathing room above
   // and below Telegram's chrome (back/close pill, ⌄ + ⋯ menu, bottom panel).

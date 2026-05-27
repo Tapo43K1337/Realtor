@@ -99,26 +99,10 @@ export function DetailScreen() {
     openTelegramChat(p.agent.tg_username, tmpl);
   };
 
-  const callAgent = async () => {
-    if (!p.agent?.phone) return;
-    // Strip whitespace/dashes — tel: URIs only accept digits, +, *, #, comma
-    const cleaned = p.agent.phone.replace(/[^\d+]/g, '');
-    const tel = `tel:${cleaned}`;
-    try {
-      // Telegram WebView blocks <a href="tel:..."> on some platforms; an
-      // explicit navigation works around it.
-      window.location.href = tel;
-    } catch {
-      // Last-ditch fallback — copy the number to clipboard so the user can
-      // paste into the dialer manually.
-      try {
-        await navigator.clipboard.writeText(p.agent.phone);
-        showToast('Номер скопійовано');
-      } catch {
-        showToast(p.agent.phone);
-      }
-    }
-  };
+  // tel: URIs only accept digits, +, *, #, comma — strip everything else.
+  const telHref = p.agent?.phone
+    ? `tel:${p.agent.phone.replace(/[^\d+]/g, '')}`
+    : undefined;
 
   const closeProperty = async () => {
     const choice = await tgPopup({
@@ -424,10 +408,10 @@ export function DetailScreen() {
             borderTop: '0.5px solid var(--hair-2)',
             display: 'flex', gap: 10,
           }}>
-            {p.agent?.phone && (
-              <button className="btn btn-secondary" onClick={callAgent} style={{ width: 50, padding: 0 }} aria-label="call">
+            {telHref && (
+              <a className="btn btn-secondary" href={telHref} style={{ width: 50, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="call">
                 <IconPhone width={20} height={20}/>
-              </button>
+              </a>
             )}
             {p.agent?.tg_username && (
               <button className="btn btn-secondary" onClick={writeTelegram} style={{ width: 50, padding: 0 }} aria-label="telegram">

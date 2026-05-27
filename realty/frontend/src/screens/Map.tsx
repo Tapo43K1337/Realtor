@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../api';
-import { fmt, priceInUsd, setUsdUahRate } from '../utils/format';
+import { fmt, priceInUsd, setUsdUahRate, getUsdUahRate } from '../utils/format';
 import type { Property, Currency } from '../types';
 import { I } from '../icons';
 import { UA } from '../data/ua';
@@ -41,7 +41,11 @@ export function MapScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Property[] | null>(null);
-  const currency: Currency = 'USD';
+  // Seed from filter param so a user who picked UAH in filters sees UAH labels;
+  // toggle below lets them flip without reopening filters.
+  const [currency, setCurrency] = useState<Currency>(
+    () => (searchParams.get('currency') as Currency) || 'USD'
+  );
 
   useEffect(() => {
     const f: any = { limit: 100, status: 'active' };
@@ -97,25 +101,59 @@ export function MapScreen() {
         </button>
       </div>
 
-      {/* Floating list toggle */}
-      <button
-        onClick={() => navigate('/')}
-        style={{
-          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-          bottom: 'calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 90px)',
-          zIndex: 500, height: 40, padding: '0 18px', borderRadius: 100,
-          background: 'var(--ink)', color: '#fff', fontSize: 13, fontWeight: 600,
-          display: 'flex', alignItems: 'center', gap: 8,
-          boxShadow: '0 4px 14px rgba(20,19,15,0.25)',
-        }}
-      >
-        {I.layers({ s: 14, c: '#fff' })} Списком
-      </button>
+      {/* Floating bottom controls: list toggle + currency switch */}
+      <div style={{
+        position: 'fixed', left: 0, right: 0,
+        bottom: 'calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 90px)',
+        zIndex: 500, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
+        pointerEvents: 'none',
+      }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            pointerEvents: 'auto',
+            height: 40, padding: '0 18px', borderRadius: 100,
+            background: 'var(--ink)', color: '#fff', fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 14px rgba(20,19,15,0.25)',
+          }}
+        >
+          {I.layers({ s: 14, c: '#fff' })} Списком
+        </button>
+        <div className="glass" role="group" aria-label="currency" style={{
+          pointerEvents: 'auto',
+          height: 40, borderRadius: 100, padding: 3,
+          display: 'flex', alignItems: 'center', gap: 2,
+          boxShadow: '0 4px 14px rgba(20,19,15,0.15)',
+        }}>
+          {(['USD', 'UAH'] as const).map((c) => {
+            const on = currency === c;
+            return (
+              <button
+                key={c}
+                onClick={() => setCurrency(c)}
+                aria-pressed={on}
+                style={{
+                  width: 34, height: 34, borderRadius: 100, border: 'none',
+                  background: on ? 'var(--ink)' : 'transparent',
+                  color: on ? '#fff' : 'var(--ink-2)',
+                  fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {c === 'USD' ? '$' : '₴'}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Map itself — leaves space at bottom for the tab bar */}
+      {/* Map itself — extends behind the tab bar (its own blur masks the edge),
+          so there's no visible gap between map and bottom nav. */}
       <div className="map-wrap" style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        bottom: 'calc(env(safe-area-inset-bottom) + var(--tg-content-bottom) + 72px)', zIndex: 1,
+        bottom: 'var(--tg-content-bottom)', zIndex: 1,
       }}>
         <MapContainer
           center={DNIPRO}
@@ -132,10 +170,10 @@ export function MapScreen() {
           <FitToBounds items={withCoords}/>
           {withCoords.map((p) => {
             const usd = priceInUsd(p.price_value, p.price_currency);
-            const label = currency === 'USD' ? fmt.usdShort(usd) : fmt.uahShort(usd * 41.2);
+            const label = currency === 'USD' ? fmt.usdShort(usd) : fmt.uahShort(usd * getUsdUahRate());
             return (
               <Marker
-                key={p.id}
+                key={`${p.id}-${currency}`}
                 position={[p.lat as number, p.lng as number]}
                 icon={makeMarker(label)}
                 eventHandlers={{ click: () => navigate(`/property/${p.id}`) }}

@@ -21,9 +21,9 @@ export function setReauth(fn: (() => Promise<string | null>) | null) { reauth = 
 
 async function doFetch(path: string, init: RequestInit, token: string | null): Promise<Response> {
   const headers: Record<string, string> = {
-    'content-type': 'application/json',
     ...(init.headers as Record<string, string> | undefined),
   };
+  if (init.body != null) headers['content-type'] = 'application/json';
   if (token) headers['authorization'] = `Bearer ${token}`;
   return fetch(`${API_URL}${path}`, { ...init, headers });
 }

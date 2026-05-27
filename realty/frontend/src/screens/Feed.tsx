@@ -10,8 +10,8 @@ import { I } from '../icons';
 import { UA } from '../data/ua';
 import { setUsdUahRate } from '../utils/format';
 
-type Op = 'all' | 'buy' | 'rent' | 'daily';
-const OP_TO_DEAL: Record<Op, DealType | undefined> = { all: undefined, buy: 'sale', rent: 'rent', daily: undefined };
+type Op = 'all' | 'buy' | 'rent';
+const OP_TO_DEAL: Record<Op, DealType | undefined> = { all: undefined, buy: 'sale', rent: 'rent' };
 
 export function FeedScreen() {
   const navigate = useNavigate();
@@ -36,7 +36,6 @@ export function FeedScreen() {
     if (deal) f.deal = deal;
     if (district) f.district = district;
     if (query) f.q = query;
-    if (op === 'daily') { setItems([]); return; } // not supported yet
 
     // Merge any filter params from URL (set by Filters screen)
     for (const k of ['type', 'building_type', 'condition',
@@ -96,10 +95,9 @@ export function FeedScreen() {
         {/* Operation segmented control */}
         <div style={{ padding: '0 16px 4px' }}>
           <div className="segment" style={{ height: 38 }}>
-            <button className={op === 'all'   ? 'on' : ''} onClick={() => setOp('all')}>Усі</button>
-            <button className={op === 'buy'   ? 'on' : ''} onClick={() => setOp('buy')}>Купити</button>
-            <button className={op === 'rent'  ? 'on' : ''} onClick={() => setOp('rent')}>Орендувати</button>
-            <button className={op === 'daily' ? 'on' : ''} onClick={() => setOp('daily')}>Подобово</button>
+            <button className={op === 'all'  ? 'on' : ''} onClick={() => setOp('all')}>Усі</button>
+            <button className={op === 'buy'  ? 'on' : ''} onClick={() => setOp('buy')}>Купити</button>
+            <button className={op === 'rent' ? 'on' : ''} onClick={() => setOp('rent')}>Орендувати</button>
           </div>
         </div>
 
@@ -163,7 +161,7 @@ export function FeedScreen() {
         {/* All listings (after featured) */}
         {rest.length > 0 && (
           <>
-            <SectionHeader title={op === 'rent' ? 'Усі об\'єкти в оренду' : op === 'buy' ? 'Усі об\'єкти на продаж' : op === 'daily' ? 'Подобово' : 'Усі об\'єкти'} action={`${total} шт.`}/>
+            <SectionHeader title={op === 'rent' ? 'Усі об\'єкти в оренду' : op === 'buy' ? 'Усі об\'єкти на продаж' : 'Усі об\'єкти'} action={`${total} шт.`}/>
             <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               {rest.map((it) => (
                 <ListingRow
