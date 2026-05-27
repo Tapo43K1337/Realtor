@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import type { Property, Currency, DealType } from '../types';
+import type { Property, DealType } from '../types';
 import { useSession } from '../session';
 import {
   TgHeader, ListingCardLg, ListingRow, SectionHeader, showToast,
@@ -27,7 +27,6 @@ export function FeedScreen() {
   const [district, setDistrict] = useState<string | undefined>(() => searchParams.get('district') || undefined);
   const [query, setQuery] = useState('');
   const [favIds, setFavIds] = useState<Set<number>>(new Set());
-  const mainCurrency: Currency = 'USD'; // primary currency for display; UAH shown as ≈
 
   // Load properties — applies URL params from Filters screen + local controls
   useEffect(() => {
@@ -149,7 +148,6 @@ export function FeedScreen() {
             <div style={{ padding: '0 16px' }}>
               <ListingCardLg
                 property={featured}
-                mainCurrency={mainCurrency}
                 onClick={() => open(featured.id)}
                 isFav={favIds.has(featured.id)}
                 onFav={() => toggleFav(featured.id)}
@@ -167,7 +165,6 @@ export function FeedScreen() {
                 <ListingRow
                   key={it.id}
                   property={it}
-                  mainCurrency={mainCurrency}
                   saved={favIds.has(it.id)}
                   onClick={() => open(it.id)}
                   onFav={() => toggleFav(it.id)}

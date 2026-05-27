@@ -131,15 +131,17 @@ export function fullPhotoUrl(photo: Photo): string {
 }
 
 // ─────────── Price label ───────────
+// Primary currency = the one the realtor entered the price in.
+// Conversion shown underneath as an approximation.
 export function PriceLabel({
-  property, mainCurrency = 'USD', big = false, light = false,
+  property, big = false, light = false,
 }: {
-  property: Property; mainCurrency?: 'USD' | 'UAH'; big?: boolean; light?: boolean;
+  property: Property; big?: boolean; light?: boolean;
 }) {
   const usd = priceInUsd(property.price_value, property.price_currency);
   const uah = priceInUah(property.price_value, property.price_currency);
-  const main = mainCurrency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
-  const alt  = mainCurrency === 'USD' ? '≈ ' + fmt.uahShort(uah) : '≈ ' + fmt.usd(usd);
+  const main = property.price_currency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
+  const alt  = property.price_currency === 'USD' ? '≈ ' + fmt.uahShort(uah) : '≈ ' + fmt.usd(usd);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: light ? 'flex-end' : 'flex-start' }}>
       <span className="num-display" style={{ fontSize: big ? 34 : 20, color: light ? '#fff' : 'var(--ink)' }}>{main}</span>
@@ -184,8 +186,8 @@ export function propertyBadge(p: Property): { tag: string; tagColor: '' | 'gold'
 }
 
 // ─────────── Listing card — large (used on feed top) ───────────
-export function ListingCardLg({ property, mainCurrency = 'USD', onClick, onFav, isFav }: {
-  property: Property; mainCurrency?: 'USD' | 'UAH'; onClick?: () => void; onFav?: () => void; isFav?: boolean;
+export function ListingCardLg({ property, onClick, onFav, isFav }: {
+  property: Property; onClick?: () => void; onFav?: () => void; isFav?: boolean;
 }) {
   const badge = propertyBadge(property);
   const title = deriveTitle(property);
@@ -216,7 +218,7 @@ export function ListingCardLg({ property, mainCurrency = 'USD', onClick, onFav, 
             </div>
             <div className="h-display" style={{ fontSize: 24, marginTop: 4, textWrap: 'balance' as CSSProperties['textWrap'] }}>{title}</div>
           </div>
-          <PriceLabel property={property} mainCurrency={mainCurrency} light/>
+          <PriceLabel property={property} light/>
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid rgba(255,255,255,0.2)' }}>
           <StatStrip property={property} light/>
@@ -227,13 +229,13 @@ export function ListingCardLg({ property, mainCurrency = 'USD', onClick, onFav, 
 }
 
 // ─────────── Listing card — wide list row ───────────
-export function ListingRow({ property, mainCurrency = 'USD', saved, onClick, onFav }: {
-  property: Property; mainCurrency?: 'USD' | 'UAH'; saved?: boolean; onClick?: () => void; onFav?: () => void;
+export function ListingRow({ property, saved, onClick, onFav }: {
+  property: Property; saved?: boolean; onClick?: () => void; onFav?: () => void;
 }) {
   const title = deriveTitle(property);
   const usd = priceInUsd(property.price_value, property.price_currency);
   const uah = priceInUah(property.price_value, property.price_currency);
-  const main = mainCurrency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
+  const main = property.price_currency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
   // Price-per-m² only makes sense for sales — for rent it'd mix monthly rate with
   // total area and produce a misleading number, so hide it.
   const perM2 = property.deal === 'sale' && property.area_total
@@ -272,15 +274,15 @@ export function ListingRow({ property, mainCurrency = 'USD', saved, onClick, onF
 }
 
 // ─────────── Listing card — vertical (grid item / hscroll item) ───────────
-export function ListingCard({ property, mainCurrency = 'USD', w = 240, onClick, onFav, isFav }: {
-  property: Property; mainCurrency?: 'USD' | 'UAH'; w?: number;
+export function ListingCard({ property, w = 240, onClick, onFav, isFav }: {
+  property: Property; w?: number;
   onClick?: () => void; onFav?: () => void; isFav?: boolean;
 }) {
   const badge = propertyBadge(property);
   const title = deriveTitle(property);
   const usd = priceInUsd(property.price_value, property.price_currency);
   const uah = priceInUah(property.price_value, property.price_currency);
-  const main = mainCurrency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
+  const main = property.price_currency === 'USD' ? fmt.usd(usd) : fmt.uah(uah);
   return (
     <div style={{ width: w, flexShrink: 0, cursor: 'pointer' }} onClick={onClick}>
       <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden' }}>
